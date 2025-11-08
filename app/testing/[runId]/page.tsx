@@ -10,7 +10,13 @@ import { MetricKPI } from "@/components/metric-kpi";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Download, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+} from "lucide-react";
 
 interface SimulationRun {
   id: string;
@@ -90,7 +96,9 @@ export default function TestRunnerPage({ params }: PageProps) {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to download report");
+      setError(
+        err instanceof Error ? err.message : "Failed to download report"
+      );
     }
   };
 
@@ -125,13 +133,17 @@ export default function TestRunnerPage({ params }: PageProps) {
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Link>
-            <h1 className="text-4xl font-bold tracking-tight">Simulation Test</h1>
+            <h1 className="text-4xl font-bold tracking-tight">
+              Simulation Test
+            </h1>
           </div>
         </div>
         <div className="container mx-auto px-4 py-8">
           <Alert variant="destructive">
             <XCircle className="h-4 w-4" />
-            <AlertDescription>{error || "Simulation run not found"}</AlertDescription>
+            <AlertDescription>
+              {error || "Simulation run not found"}
+            </AlertDescription>
           </Alert>
         </div>
       </div>
@@ -153,7 +165,9 @@ export default function TestRunnerPage({ params }: PageProps) {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold tracking-tight">E2E Simulation Test</h1>
+                <h1 className="text-4xl font-bold tracking-tight">
+                  E2E Simulation Test
+                </h1>
                 {run.finished && (
                   <Badge
                     variant={run.success ? "default" : "destructive"}
@@ -214,7 +228,9 @@ export default function TestRunnerPage({ params }: PageProps) {
                   />
                   <MetricKPI
                     label="Error Rate"
-                    value={`${(run.projections.error_rate_pct || 0).toFixed(2)}%`}
+                    value={`${(run.projections.error_rate_pct || 0).toFixed(
+                      2
+                    )}%`}
                     tooltip="Projected error rate"
                     trend={
                       (run.projections.error_rate_pct || 0) < 1
@@ -236,7 +252,9 @@ export default function TestRunnerPage({ params }: PageProps) {
               <CardContent>
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-sm font-medium text-muted-foreground">Cohort Size</dt>
+                    <dt className="text-sm font-medium text-muted-foreground">
+                      Cohort Size
+                    </dt>
                     <dd className="text-lg font-semibold mt-1">
                       {run.cohortSize?.toLocaleString()}
                     </dd>
@@ -246,13 +264,19 @@ export default function TestRunnerPage({ params }: PageProps) {
                       <dt className="text-sm font-medium text-muted-foreground">
                         Test Percentage
                       </dt>
-                      <dd className="text-lg font-semibold mt-1">{run.inputs.testPercentage}%</dd>
+                      <dd className="text-lg font-semibold mt-1">
+                        {run.inputs.testPercentage}%
+                      </dd>
                     </div>
                   )}
                   {run.inputs.duration && (
                     <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Duration</dt>
-                      <dd className="text-lg font-semibold mt-1">{run.inputs.duration}</dd>
+                      <dt className="text-sm font-medium text-muted-foreground">
+                        Duration
+                      </dt>
+                      <dd className="text-lg font-semibold mt-1">
+                        {run.inputs.duration}
+                      </dd>
                     </div>
                   )}
                 </dl>
@@ -263,7 +287,9 @@ export default function TestRunnerPage({ params }: PageProps) {
             {run.errors.length > 0 && (
               <Card className="border-destructive">
                 <CardHeader>
-                  <CardTitle className="text-destructive">Errors ({run.errors.length})</CardTitle>
+                  <CardTitle className="text-destructive">
+                    Errors ({run.errors.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -309,4 +335,3 @@ export default function TestRunnerPage({ params }: PageProps) {
     </div>
   );
 }
-

@@ -47,7 +47,9 @@ const STEP_DELAY_MS = 500; // Artificial delay per step
 /**
  * Start a new simulation run for a campaign
  */
-export async function startSimulation(campaignId: string): Promise<SimulationRun> {
+export async function startSimulation(
+  campaignId: string
+): Promise<SimulationRun> {
   console.log(`[Simulation] Starting simulation for campaign: ${campaignId}`);
 
   // Fetch campaign data
@@ -69,7 +71,8 @@ export async function startSimulation(campaignId: string): Promise<SimulationRun
 
   // Calculate cohort size from segments
   const cohortSize = campaign.campaignSegments.reduce((sum, cs) => {
-    const estimatedSize = (cs.segment.definitionJson as any)?.estimatedSize || 10000;
+    const estimatedSize =
+      (cs.segment.definitionJson as any)?.estimatedSize || 10000;
     return sum + estimatedSize;
   }, 0);
 
@@ -118,7 +121,9 @@ export async function startSimulation(campaignId: string): Promise<SimulationRun
 /**
  * Get the current status of a simulation run
  */
-export async function getRunStatus(runId: string): Promise<SimulationRun | null> {
+export async function getRunStatus(
+  runId: string
+): Promise<SimulationRun | null> {
   const run = await db.query.simulationRuns.findFirst({
     where: (runs, { eq }) => eq(runs.id, runId),
   });
@@ -136,7 +141,7 @@ export async function getRunStatus(runId: string): Promise<SimulationRun | null>
  */
 async function progressSimulation(runId: string): Promise<void> {
   const totalSteps = SIMULATION_STEPS.length;
-  let currentStep = simulationProgress.get(runId) || 0;
+  const currentStep = simulationProgress.get(runId) || 0;
 
   // Process steps sequentially with delays
   for (let i = currentStep; i < totalSteps; i++) {
@@ -173,7 +178,9 @@ async function progressSimulation(runId: string): Promise<void> {
         .where(eq(simulationRuns.id, runId));
 
       simulationProgress.delete(runId);
-      console.log(`[Simulation] Run ${runId} failed at step: ${SIMULATION_STEPS[i].label}`);
+      console.log(
+        `[Simulation] Run ${runId} failed at step: ${SIMULATION_STEPS[i].label}`
+      );
       return;
     }
 
@@ -225,4 +232,3 @@ async function updateStepStatus(
     })
     .where(eq(simulationRuns.id, runId));
 }
-
