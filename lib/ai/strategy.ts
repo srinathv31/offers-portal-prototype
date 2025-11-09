@@ -1,77 +1,72 @@
-import OpenAI from "openai";
+import { generateObject } from "ai";
+import { z } from "zod";
+import { getAIProvider, getAIModel } from "./config";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY environment variable is not set");
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Zod schema for StrategySuggestion
+const StrategySuggestionSchema = z.object({
+  nameHint: z.string().optional(),
+  purposeHint: z.string().optional(),
+  recommendedOffers: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: z.string(),
+        vendor: z.string().optional(),
+        parameters: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .optional(),
+  segments: z
+    .array(
+      z.object({
+        name: z.string(),
+        source: z.enum(["CDC", "RAHONA", "CUSTOM"]),
+        definitionJson: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .optional(),
+  channels: z.array(z.string()).optional(),
+  timelines: z
+    .object({
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    })
+    .optional(),
+  notes: z.array(z.string()).optional(),
+  vendorHintsByOfferType: z.record(z.string(), z.array(z.string())).optional(),
 });
 
-export interface StrategySuggestion {
-  nameHint?: string;
-  purposeHint?: string;
-  recommendedOffers?: Array<{
-    name: string;
-    type: string;
-    vendor?: string;
-    parameters?: Record<string, unknown>;
-  }>;
-  segments?: Array<{
-    name: string;
-    source: "CDC" | "RAHONA" | "CUSTOM";
-    definitionJson?: Record<string, unknown>;
-  }>;
-  channels?: string[];
-  timelines?: {
-    startDate?: string;
-    endDate?: string;
-  };
-  notes?: string[];
-  vendorHintsByOfferType?: Record<string, string[]>;
-}
+export type StrategySuggestion = z.infer<typeof StrategySuggestionSchema>;
 
 export async function generateStrategySuggestion(
   season: string,
   objective: string
 ): Promise<StrategySuggestion> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a marketing strategy AI assistant for a credit card offers platform. 
-          Generate campaign strategy suggestions including:
-          - Campaign name and purpose
-          - Recommended offers (points multipliers, cashback, bonuses)
-          - Target segments
-          - Marketing channels (EMAIL, MOBILE, WEB)
-          - Timeline suggestions
-          - Vendor recommendations (Amazon, Target, Nike, etc.)
-          
-          Return structured JSON that matches the StrategySuggestion interface.`,
-        },
-        {
-          role: "user",
-          content: `Generate a campaign strategy for:
-          Season: ${season}
-          Objective: ${objective}
-          
-          Provide a comprehensive strategy with specific offers, segments, and channels.`,
-        },
-      ],
-      response_format: { type: "json_object" },
+    const provider = getAIProvider();
+    const model = getAIModel();
+
+    const { object } = await generateObject({
+      model: provider(model),
+      schema: StrategySuggestionSchema,
+      prompt: `You are a marketing strategy AI assistant for a credit card offers platform. 
+Generate campaign strategy suggestions including:
+- Campaign name and purpose
+- Recommended offers (points multipliers, cashback, bonuses)
+- Target segments
+- Marketing channels (EMAIL, MOBILE, WEB)
+- Timeline suggestions
+- Vendor recommendations (Amazon, Target, Nike, etc.)
+
+Generate a campaign strategy for:
+Season: ${season}
+Objective: ${objective}
+
+Provide a comprehensive strategy with specific offers, segments, and channels.`,
       temperature: 0.7,
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("No response from OpenAI");
-    }
-
-    const parsed = JSON.parse(content) as StrategySuggestion;
-    return parsed;
+    return object;
   } catch (error) {
     console.error("Error generating AI strategy:", error);
     // Fallback to deterministic mock
