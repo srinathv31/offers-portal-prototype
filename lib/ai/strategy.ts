@@ -1,6 +1,10 @@
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { getAIModel, getProviderName } from "./config";
-import { strategySuggestionSchema, type StrategyInput, type StrategySuggestion } from "./types";
+import {
+  strategySuggestionSchema,
+  type StrategyInput,
+  type StrategySuggestion,
+} from "./types";
 
 /**
  * Generate campaign strategy suggestions using AI.
@@ -25,7 +29,35 @@ export async function generateCampaignStrategy(
   const prompt = buildStrategyPrompt(input);
 
   try {
-    // Use AI SDK's generateObject for structured output
+    // For local LLMs (LM Studio), use generateText and manual JSON parsing
+    // because they don't support structured output formats properly
+    if (providerName === "lmstudio" || providerName === "local") {
+      console.log(`[AI Strategy] Using text generation mode for local LLM`);
+
+      const result = await generateText({
+        model,
+        prompt: prompt + "\n\nRespond with ONLY valid JSON, no other text.",
+        temperature: 0.7,
+      });
+
+      console.log(`[AI Strategy] Raw response from local LLM:`, result.text);
+
+      // Parse and validate JSON response
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No valid JSON found in response");
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      const validated = strategySuggestionSchema.parse(parsed);
+
+      console.log(
+        `[AI Strategy] Successfully generated strategy using ${providerName}`
+      );
+      return validated;
+    }
+
+    // For OpenAI and Anthropic, use structured output with generateObject
     const result = await generateObject({
       model,
       schema: strategySuggestionSchema,
@@ -33,10 +65,15 @@ export async function generateCampaignStrategy(
       temperature: 0.7,
     });
 
-    console.log(`[AI Strategy] Successfully generated strategy using ${providerName}`);
+    console.log(
+      `[AI Strategy] Successfully generated strategy using ${providerName}`
+    );
     return result.object;
   } catch (error) {
-    console.error(`[AI Strategy] Error generating strategy with ${providerName}:`, error);
+    console.error(
+      `[AI Strategy] Error generating strategy with ${providerName}:`,
+      error
+    );
     throw new Error(`Failed to generate campaign strategy: ${error}`);
   }
 }
@@ -70,7 +107,9 @@ function buildStrategyPrompt(input: StrategyInput): string {
   prompt += `
 
 **Requirements:**
-1. Suggest 3-5 relevant offers that align with the objective${season ? ` and ${season} season` : ""}.
+1. Suggest 3-5 relevant offers that align with the objective${
+    season ? ` and ${season} season` : ""
+  }.
 2. Recommend customer segments to target (use data sources: CDC for transaction history, RAHONA for behavioral data, or CUSTOM for specific criteria).
 3. Suggest appropriate marketing channels (EMAIL, MOBILE, WEB, SMS).
 4. Provide a realistic campaign timeline with start and end dates.
@@ -84,6 +123,37 @@ ${vendorSuggestions}
 - CASHBACK: Percentage cashback on purchases (e.g., 5% back on groceries)
 - DISCOUNT: Direct discount on purchases (e.g., 15% off at specific merchants)
 - BONUS: Bonus points/rewards for meeting spend thresholds (e.g., 10,000 bonus points after spending $500)
+
+**IMPORTANT:** Respond with ONLY valid JSON matching this exact structure:
+{
+  "nameHint": "string (optional)",
+  "purposeHint": "string (optional)",
+  "recommendedOffers": [
+    {
+      "name": "string",
+      "type": "POINTS_MULTIPLIER | CASHBACK | DISCOUNT | BONUS",
+      "vendor": "string (optional)",
+      "reasoning": "string"
+    }
+  ],
+  "segments": [
+    {
+      "name": "string",
+      "source": "CDC | RAHONA | CUSTOM",
+      "criteria": "string"
+    }
+  ],
+  "channels": ["EMAIL" | "MOBILE" | "WEB" | "SMS"],
+  "timelines": {
+    "recommendedStart": "YYYY-MM-DD",
+    "recommendedEnd": "YYYY-MM-DD",
+    "rationale": "string"
+  },
+  "notes": ["string (optional)"],
+  "vendorHintsByOfferType": {
+    "OFFER_TYPE": ["vendor1", "vendor2"]
+  }
+}
 
 Generate a data-driven, actionable strategy that maximizes customer engagement and campaign ROI.`;
 
@@ -186,4 +256,3 @@ function getSeasonalVendors(season?: string): string {
 
   return "Popular vendors: Amazon, Target, Walmart, Starbucks, Nike, Whole Foods, Shell, Delta Airlines";
 }
-

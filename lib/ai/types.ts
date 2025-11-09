@@ -3,7 +3,10 @@ import { z } from "zod";
 // Zod schema for AI strategy suggestion
 export const strategySuggestionSchema = z.object({
   nameHint: z.string().optional().describe("Suggested campaign name"),
-  purposeHint: z.string().optional().describe("Suggested campaign purpose/description"),
+  purposeHint: z
+    .string()
+    .optional()
+    .describe("Suggested campaign purpose/description"),
   recommendedOffers: z
     .array(
       z.object({
@@ -11,7 +14,10 @@ export const strategySuggestionSchema = z.object({
         type: z
           .enum(["POINTS_MULTIPLIER", "CASHBACK", "DISCOUNT", "BONUS"])
           .describe("Offer type"),
-        vendor: z.string().optional().describe("Vendor/merchant name if applicable"),
+        vendor: z
+          .string()
+          .optional()
+          .describe("Vendor/merchant name if applicable"),
         reasoning: z.string().describe("Why this offer is recommended"),
       })
     )
@@ -43,7 +49,7 @@ export const strategySuggestionSchema = z.object({
     .optional()
     .describe("Additional strategic notes or considerations"),
   vendorHintsByOfferType: z
-    .record(z.array(z.string()))
+    .record(z.string(), z.array(z.string()))
     .optional()
     .describe("Vendor suggestions grouped by offer type"),
 });
@@ -58,4 +64,3 @@ export type StrategyInput = {
   targetSegment?: string;
   budget?: number;
 };
-
