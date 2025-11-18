@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from "@/lib/db";
 import { simulationRuns } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -32,17 +33,24 @@ interface SimulationRun {
 // In production, this would be in Redis or similar
 const simulationProgress = new Map<string, number>();
 
-const SIMULATION_STEPS: Array<{ key: string; label: string }> = [
-  { key: "rules-compile", label: "Rules Compilation" },
-  { key: "data-availability", label: "Data Availability Check" },
-  { key: "channel-mock", label: "Channel Distribution Mock" },
-  { key: "presentment", label: "Offer Presentment Simulation" },
-  { key: "disposition", label: "Disposition Processing" },
-  { key: "fulfillment", label: "Fulfillment Simulation" },
-  { key: "report", label: "Report Generation" },
+const SIMULATION_STEPS: Array<{
+  key: string;
+  label: string;
+  duration: number;
+  shouldFail?: boolean;
+}> = [
+  { key: "rules-compile", label: "Rules Compilation", duration: 2000 },
+  {
+    key: "data-availability",
+    label: "Data Availability Check",
+    duration: 1500,
+  },
+  { key: "channel-mock", label: "Channel Distribution Mock", duration: 2500 },
+  { key: "presentment", label: "Offer Presentment Simulation", duration: 3000 },
+  { key: "disposition", label: "Disposition Processing", duration: 2000 },
+  { key: "fulfillment", label: "Fulfillment Simulation", duration: 2500 },
+  { key: "report", label: "Report Generation", duration: 1500 },
 ];
-
-const STEP_DELAY_MS = 500; // Artificial delay per step
 
 /**
  * Start a new simulation run for a campaign
@@ -76,12 +84,8 @@ export async function startSimulation(
     return sum + estimatedSize;
   }, 0);
 
-  // Generate projections based on campaign offers
-  const projections = {
-    revenue: Math.floor(cohortSize * 0.35 * 85 + Math.random() * 100000),
-    activations: Math.floor(cohortSize * 0.35 + Math.random() * 1000),
-    error_rate_pct: Math.random() * 1.5,
-  };
+  // Initialize projections as empty - they will be calculated progressively
+  const projections = {};
 
   // Create initial simulation run with all steps pending
   const initialSteps: SimulationStep[] = SIMULATION_STEPS.map((step) => ({
@@ -136,39 +140,83 @@ export async function getRunStatus(
 }
 
 /**
+ * Update projections after specific steps complete
+ * This creates the illusion of dynamic calculation
+ */
+async function updateProjectionsAfterStep(
+  runId: string,
+  stepIndex: number
+): Promise<void> {
+  const run = await db.query.simulationRuns.findFirst({
+    where: (runs, { eq }) => eq(runs.id, runId),
+  });
+
+  if (!run) return;
+
+  const cohortSize = run.cohortSize;
+  const currentProjections = run.projections as Record<string, any>;
+  let updatedProjections = { ...currentProjections };
+
+  // Step 4 (Disposition Processing) - Calculate activations and revenue
+  if (stepIndex === 4) {
+    updatedProjections = {
+      ...updatedProjections,
+      activations: Math.floor(cohortSize * 0.35 + Math.random() * 1000),
+      revenue: Math.floor(cohortSize * 0.35 * 85 + Math.random() * 100000),
+    };
+  }
+
+  // Step 5 (Fulfillment Simulation) - Calculate error rate
+  if (stepIndex === 5) {
+    updatedProjections = {
+      ...updatedProjections,
+      error_rate_pct: Math.random() * 1.5,
+    };
+  }
+
+  // Update projections in database if they changed
+  if (Object.keys(updatedProjections).length > Object.keys(currentProjections).length) {
+    await db
+      .update(simulationRuns)
+      .set({
+        projections: updatedProjections,
+      })
+      .where(eq(simulationRuns.id, runId));
+  }
+}
+
+/**
  * Progress the simulation steps asynchronously
  * This simulates real processing with artificial delays
  */
 async function progressSimulation(runId: string): Promise<void> {
-  const totalSteps = SIMULATION_STEPS.length;
-  const currentStep = simulationProgress.get(runId) || 0;
+  const steps = [...SIMULATION_STEPS];
 
   // Process steps sequentially with delays
-  for (let i = currentStep; i < totalSteps; i++) {
-    // Wait for artificial delay
-    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY_MS));
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
 
-    // Update step to RUNNING
-    await updateStepStatus(runId, i, "RUNNING");
+    // Update current step to RUNNING (all previous are DONE, current is RUNNING, rest are PENDING)
+    await updateAllSteps(runId, i, "RUNNING");
 
-    // Small delay for running state
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait for step duration
+    await new Promise((resolve) => setTimeout(resolve, step.duration));
 
-    // Randomly fail at a very low rate (5% chance on non-critical steps)
-    const shouldFail = Math.random() < 0.05 && i > 2;
+    // Randomly fail at a very low rate (3% chance on non-critical steps)
+    const shouldFail = step.shouldFail ?? Math.random() < 0.03;
 
     if (shouldFail) {
       // Mark step as failed
-      await updateStepStatus(runId, i, "FAIL");
+      await updateAllSteps(runId, i, "FAIL");
 
-      // Add error
+      // Add error and mark run as failed
       await db
         .update(simulationRuns)
         .set({
           errors: [
             {
-              message: `Simulated error in ${SIMULATION_STEPS[i].label}`,
-              step: SIMULATION_STEPS[i].key,
+              message: `Simulated error in ${step.label}`,
+              step: step.key,
             },
           ],
           finished: true,
@@ -178,15 +226,16 @@ async function progressSimulation(runId: string): Promise<void> {
         .where(eq(simulationRuns.id, runId));
 
       simulationProgress.delete(runId);
-      console.log(
-        `[Simulation] Run ${runId} failed at step: ${SIMULATION_STEPS[i].label}`
-      );
+      console.log(`[Simulation] Run ${runId} failed at step: ${step.label}`);
       return;
     }
 
-    // Mark step as done
-    await updateStepStatus(runId, i, "DONE");
+    // Mark step as DONE
+    await updateAllSteps(runId, i, "DONE");
     simulationProgress.set(runId, i + 1);
+
+    // Progressively calculate projections after specific steps
+    await updateProjectionsAfterStep(runId, i);
   }
 
   // All steps completed successfully
@@ -204,26 +253,24 @@ async function progressSimulation(runId: string): Promise<void> {
 }
 
 /**
- * Update the status of a specific step in the simulation
+ * Update all steps to reflect the current progression state
+ * All steps before currentIndex are DONE, currentIndex has currentStatus, rest are PENDING
  */
-async function updateStepStatus(
+async function updateAllSteps(
   runId: string,
-  stepIndex: number,
-  status: StepStatus
+  currentIndex: number,
+  currentStatus: StepStatus
 ): Promise<void> {
-  const run = await db.query.simulationRuns.findFirst({
-    where: (runs, { eq }) => eq(runs.id, runId),
-  });
-
-  if (!run) {
-    return;
-  }
-
-  const updatedSteps = [...(run.steps as SimulationStep[])];
-  updatedSteps[stepIndex] = {
-    ...updatedSteps[stepIndex],
-    status,
-  };
+  const updatedSteps = SIMULATION_STEPS.map((step, idx) => ({
+    key: step.key,
+    label: step.label,
+    status:
+      idx < currentIndex
+        ? ("DONE" as const)
+        : idx === currentIndex
+        ? currentStatus
+        : ("PENDING" as const),
+  }));
 
   await db
     .update(simulationRuns)

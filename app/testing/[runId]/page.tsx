@@ -1,22 +1,27 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ProgressList } from "@/components/progress-list";
-import { MetricKPI } from "@/components/metric-kpi";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  ArrowLeft,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
   Download,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
+  Loader2,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SimulationRun {
   id: string;
@@ -40,46 +45,59 @@ interface SimulationRun {
   finishedAt?: Date | null;
 }
 
-interface PageProps {
+export default function TestRunnerPage({
+  params,
+}: {
   params: Promise<{ runId: string }>;
-}
-
-export default function TestRunnerPage({ params }: PageProps) {
-  const { runId } = use(params);
-  const router = useRouter();
+}) {
+  const [runId, setRunId] = useState<string | null>(null);
   const [run, setRun] = useState<SimulationRun | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchRunStatus = async () => {
-    try {
-      const response = await fetch(`/api/simulate/status?runId=${runId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch simulation status");
-      }
-      const data = await response.json();
-      setRun(data.run);
-      setLoading(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch status");
-      setLoading(false);
-    }
-  };
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    fetchRunStatus();
+    params.then((p) => setRunId(p.runId));
+  }, [params]);
 
-    // Poll every 2 seconds if not finished
-    const interval = setInterval(() => {
-      if (!run?.finished) {
-        fetchRunStatus();
+  useEffect(() => {
+    if (!runId) return;
+
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch(`/api/simulate/status?runId=${runId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch simulation status");
+        }
+        const data = await response.json();
+        setRun(data.run);
+        setLoading(false);
+
+        // Stop polling if simulation is finished
+        if (data.run?.finished && intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      } catch (error) {
+        console.error("Error fetching simulation status:", error);
+        setLoading(false);
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
-  }, [runId, run?.finished]);
+    fetchStatus();
+    intervalRef.current = setInterval(fetchStatus, 1000); // Poll every 1 second
 
-  const handleDownloadReport = async () => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [runId]);
+
+  const handleDownload = async () => {
+    if (!runId) return;
     try {
       const response = await fetch(`/api/export-report?runId=${runId}`);
       if (!response.ok) {
@@ -95,241 +113,237 @@ export default function TestRunnerPage({ params }: PageProps) {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to download report"
-      );
+    } catch (error) {
+      console.error("Error downloading report:", error);
     }
   };
 
-  if (loading) {
+  const handleStartNew = () => {
+    const campaignId = searchParams.get("campaignId");
+    if (campaignId) {
+      router.push(`/campaigns/${campaignId}`);
+    } else {
+      router.push("/");
+    }
+  };
+
+  if (loading || !run) {
     return (
-      <div className="min-h-screen">
-        <div className="border-b">
-          <div className="container mx-auto px-4 py-6">
-            <Skeleton className="h-4 w-32 mb-4" />
-            <Skeleton className="h-12 w-96" />
-          </div>
-        </div>
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Skeleton className="h-96 lg:col-span-2" />
-            <Skeleton className="h-96" />
-          </div>
-        </div>
+      <div className="container mx-auto py-8 px-4">
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
-  if (error || !run) {
-    return (
-      <div className="min-h-screen">
-        <div className="border-b">
-          <div className="container mx-auto px-4 py-6">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Link>
-            <h1 className="text-4xl font-bold tracking-tight">
-              Simulation Test
-            </h1>
-          </div>
-        </div>
-        <div className="container mx-auto px-4 py-8">
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription>
-              {error || "Simulation run not found"}
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
+  const completedSteps = run.steps.filter((s) => s.status === "DONE").length;
+  const totalSteps = run.steps.length;
+  const progress = (completedSteps / totalSteps) * 100;
+
+  const statusColors: Record<string, string> = {
+    PENDING: "bg-gray-500",
+    RUNNING: "bg-blue-500",
+    DONE: "bg-green-500",
+    FAIL: "bg-red-500",
+  };
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-6">
-          <Link
-            href={`/campaigns/${run.campaignId}`}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Campaign
-          </Link>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold tracking-tight">
-                  E2E Simulation Test
-                </h1>
-                {run.finished && (
-                  <Badge
-                    variant={run.success ? "default" : "destructive"}
-                    className="text-sm"
+    <div className="container mx-auto py-8 px-4">
+      <div className="mb-6">
+        <Link href="/" className="text-muted-foreground hover:text-foreground">
+          ← Back to Dashboard
+        </Link>
+      </div>
+
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">E2E Test Run</h1>
+          <p className="text-muted-foreground">Simulation Run ID: {run.id}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleStartNew}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Start New Test
+          </Button>
+          {run.finished && (
+            <Button onClick={handleDownload}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test Progress</CardTitle>
+              <CardDescription>Step-by-step execution status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">Overall Progress</span>
+                  <span className="text-sm text-muted-foreground">
+                    {completedSteps} / {totalSteps} steps
+                  </span>
+                </div>
+                <Progress value={progress} className="h-2" />
+              </div>
+
+              <div className="space-y-2">
+                {run.steps.map((step, index) => (
+                  <div
+                    key={step.key}
+                    className="flex items-center gap-3 p-3 border rounded-lg"
                   >
+                    <div className="shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-white border-0 ${
+                          statusColors[step.status]
+                        }`}
+                      >
+                        {index + 1}
+                      </Badge>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{step.label}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {step.status}
+                      </div>
+                    </div>
+                    {step.status === "RUNNING" && (
+                      <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                    )}
+                    {step.status === "DONE" && (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    )}
+                    {step.status === "FAIL" && (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {run.finished && (
+                <div className="mt-4 p-4 bg-muted rounded-lg">
+                  <div className="font-medium mb-2 flex items-center gap-2">
                     {run.success ? (
                       <>
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Complete
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        Test Completed Successfully
                       </>
                     ) : (
                       <>
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Failed
+                        <XCircle className="h-5 w-5 text-red-500" />
+                        Test Failed
                       </>
                     )}
-                  </Badge>
-                )}
-                {!run.finished && (
-                  <Badge variant="secondary" className="text-sm animate-pulse">
-                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                    Running
-                  </Badge>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Simulation finished. You can download the report for
+                    detailed results.
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Projections</CardTitle>
+              <CardDescription>
+                Estimated results from simulation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {run.cohortSize !== undefined && (
+                <div>
+                  <div className="text-sm text-muted-foreground">
+                    Cohort Size
+                  </div>
+                  <div className="text-2xl font-bold">
+                    {run.cohortSize.toLocaleString()}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div className="text-sm text-muted-foreground">
+                  Projected Revenue
+                </div>
+                {run.projections?.revenue !== undefined ? (
+                  <div className="text-2xl font-bold text-green-600">
+                    ${run.projections.revenue.toLocaleString()}
+                  </div>
+                ) : (
+                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                    {!run.finished ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Calculating...</span>
+                      </>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </div>
                 )}
               </div>
-              <p className="text-muted-foreground">Run ID: {run.id}</p>
-            </div>
-            {run.finished && (
-              <Button onClick={handleDownloadReport} className="gap-2">
-                <Download className="h-4 w-4" />
-                Download Report
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Panel: Projections & Metrics */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Projections */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Projected Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <MetricKPI
-                    label="Revenue"
-                    value={run.projections.revenue || 0}
-                    tooltip="Projected revenue from this campaign"
-                  />
-                  <MetricKPI
-                    label="Activations"
-                    value={run.projections.activations || 0}
-                    tooltip="Projected number of customer activations"
-                  />
-                  <MetricKPI
-                    label="Error Rate"
-                    value={`${(run.projections.error_rate_pct || 0).toFixed(
-                      2
-                    )}%`}
-                    tooltip="Projected error rate"
-                    trend={
-                      (run.projections.error_rate_pct || 0) < 1
-                        ? "up"
-                        : (run.projections.error_rate_pct || 0) > 2
-                        ? "down"
-                        : "neutral"
-                    }
-                  />
+              <div>
+                <div className="text-sm text-muted-foreground">
+                  Projected Activations
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Test Inputs */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Test Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-sm font-medium text-muted-foreground">
-                      Cohort Size
-                    </dt>
-                    <dd className="text-lg font-semibold mt-1">
-                      {run.cohortSize?.toLocaleString()}
-                    </dd>
+                {run.projections?.activations !== undefined ? (
+                  <div className="text-2xl font-bold">
+                    {run.projections.activations.toLocaleString()}
                   </div>
-                  {run.inputs.testPercentage && (
-                    <div>
-                      <dt className="text-sm font-medium text-muted-foreground">
-                        Test Percentage
-                      </dt>
-                      <dd className="text-lg font-semibold mt-1">
-                        {run.inputs.testPercentage}%
-                      </dd>
-                    </div>
-                  )}
-                  {run.inputs.duration && (
-                    <div>
-                      <dt className="text-sm font-medium text-muted-foreground">
-                        Duration
-                      </dt>
-                      <dd className="text-lg font-semibold mt-1">
-                        {run.inputs.duration}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-              </CardContent>
-            </Card>
-
-            {/* Errors (if any) */}
-            {run.errors.length > 0 && (
-              <Card className="border-destructive">
-                <CardHeader>
-                  <CardTitle className="text-destructive">
-                    Errors ({run.errors.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {run.errors.map((error, idx) => (
-                      <Alert key={idx} variant="destructive">
-                        <XCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          {error.step && <strong>{error.step}: </strong>}
-                          {error.message}
-                        </AlertDescription>
-                      </Alert>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Right Panel: Progress Steps */}
-          <div>
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle>Simulation Steps</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProgressList steps={run.steps} />
-
-                {run.finished && run.success && (
-                  <div className="mt-6 pt-6 border-t">
-                    <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      <AlertDescription className="text-green-800 dark:text-green-200">
-                        Simulation completed successfully with no errors.
-                      </AlertDescription>
-                    </Alert>
+                ) : (
+                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                    {!run.finished ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Calculating...</span>
+                      </>
+                    ) : (
+                      <span>—</span>
+                    )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+
+              <div>
+                <div className="text-sm text-muted-foreground">
+                  Error Rate
+                </div>
+                {run.projections?.error_rate_pct !== undefined ? (
+                  <div
+                    className={`text-2xl font-bold ${
+                      run.projections.error_rate_pct > 1
+                        ? "text-red-600"
+                        : "text-green-600"
+                    }`}
+                  >
+                    {run.projections.error_rate_pct.toFixed(2)}%
+                  </div>
+                ) : (
+                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                    {!run.finished ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Calculating...</span>
+                      </>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
