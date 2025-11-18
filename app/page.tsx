@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense } from "react";
 import { getAllCampaignsGrouped } from "@/lib/db";
 import { CampaignCard } from "@/components/campaign-card";
@@ -13,12 +15,12 @@ async function DashboardContent() {
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
       {/* POC Banner */}
-      <Alert className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+      {/* <Alert className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
         <AlertDescription className="text-sm">
           <strong>POC Only:</strong> This is a prototype environment. All data is mocked for
           demonstration purposes.
         </AlertDescription>
-      </Alert>
+      </Alert> */}
 
       {/* Live Campaigns */}
       {grouped.LIVE.length > 0 && (
@@ -132,7 +134,9 @@ export default function Home() {
     <div className="min-h-screen">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-4xl font-bold tracking-tight">Campaign Dashboard</h1>
+          <h1 className="text-4xl font-bold tracking-tight">
+            Campaign Dashboard
+          </h1>
           <p className="text-muted-foreground mt-2">
             Manage and monitor your credit card offers campaigns
           </p>
