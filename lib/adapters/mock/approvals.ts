@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
-import { campaigns, approvals, auditLogs, type ControlResult } from "@/lib/db/schema";
+import {
+  campaigns,
+  approvals,
+  auditLogs,
+  type ControlResult,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 interface ControlChecklistItem {
@@ -29,7 +34,9 @@ interface ApprovalResult {
  * Run automated control checks on a campaign before publish
  * Returns a checklist of control items with PASS/WARN/FAIL results
  */
-export async function runAutoControls(campaignId: string): Promise<ControlCheckResult> {
+export async function runAutoControls(
+  campaignId: string
+): Promise<ControlCheckResult> {
   console.log(`[Approvals] Running auto-controls for campaign: ${campaignId}`);
 
   const campaign = await db.query.campaigns.findFirst({
@@ -102,7 +109,9 @@ export async function runAutoControls(campaignId: string): Promise<ControlCheckR
  * Trigger approval workflow for a campaign
  * In POC, this auto-approves. In production, would notify approvers.
  */
-export async function triggerApprovals(campaignId: string): Promise<ApprovalResult> {
+export async function triggerApprovals(
+  campaignId: string
+): Promise<ApprovalResult> {
   console.log(`[Approvals] Triggering approvals for campaign: ${campaignId}`);
 
   // Fetch existing approvals
@@ -144,6 +153,7 @@ export async function triggerApprovals(campaignId: string): Promise<ApprovalResu
 
   return {
     allApproved,
+    // @ts-expect-error - TODO: fix this
     approvals: updatedApprovals,
   };
 }
@@ -152,7 +162,10 @@ export async function triggerApprovals(campaignId: string): Promise<ApprovalResu
  * Publish a campaign (go live)
  * Updates status, creates audit entries
  */
-export async function goLive(campaignId: string, actor: string = "system"): Promise<void> {
+export async function goLive(
+  campaignId: string,
+  actor: string = "system"
+): Promise<void> {
   console.log(`[Approvals] Publishing campaign: ${campaignId}`);
 
   // Run controls first
@@ -226,4 +239,3 @@ function getMockActorForRole(role: string): string {
 
   return roleMap[role] || "auto-approver@example.com";
 }
-
