@@ -316,9 +316,7 @@ export default function TestRunnerPage({
               </div>
 
               <div>
-                <div className="text-sm text-muted-foreground">
-                  Error Rate
-                </div>
+                <div className="text-sm text-muted-foreground">Error Rate</div>
                 {run.projections?.error_rate_pct !== undefined ? (
                   <div
                     className={`text-2xl font-bold ${

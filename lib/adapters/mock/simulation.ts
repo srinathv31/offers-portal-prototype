@@ -175,7 +175,10 @@ async function updateProjectionsAfterStep(
   }
 
   // Update projections in database if they changed
-  if (Object.keys(updatedProjections).length > Object.keys(currentProjections).length) {
+  if (
+    Object.keys(updatedProjections).length >
+    Object.keys(currentProjections).length
+  ) {
     await db
       .update(simulationRuns)
       .set({
