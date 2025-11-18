@@ -6,16 +6,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { season, objective, targetSegment, budget } = body;
 
-    if (!objective) {
-      return NextResponse.json(
-        { error: "Objective is required" },
-        { status: 400 }
-      );
-    }
+    // Allow empty objective for auto-generation
+    const objectiveToUse =
+      objective || "Generate an engaging campaign for the current season";
 
     const suggestion = await generateCampaignStrategy({
       season,
-      objective,
+      objective: objectiveToUse,
       targetSegment,
       budget,
     });
@@ -29,4 +26,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
