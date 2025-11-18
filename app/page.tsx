@@ -1,65 +1,147 @@
-import Image from "next/image";
+import { Suspense } from "react";
+import { getAllCampaignsGrouped } from "@/lib/db";
+import { CampaignCard } from "@/components/campaign-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Rocket, ClipboardCheck, Archive } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+async function DashboardContent() {
+  const grouped = await getAllCampaignsGrouped();
+
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      {/* POC Banner */}
+      <Alert className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+        <AlertDescription className="text-sm">
+          <strong>POC Only:</strong> This is a prototype environment. All data is mocked for
+          demonstration purposes.
+        </AlertDescription>
+      </Alert>
+
+      {/* Live Campaigns */}
+      {grouped.LIVE.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Rocket className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <h2 className="text-2xl font-bold">Live Campaigns</h2>
+            <span className="text-sm text-muted-foreground">
+              ({grouped.LIVE.length})
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.LIVE.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                id={campaign.id}
+                name={campaign.name}
+                purpose={campaign.purpose}
+                status={campaign.status}
+                metrics={campaign.metrics as any}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* In Review Campaigns */}
+      {grouped.IN_REVIEW.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <ClipboardCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-2xl font-bold">In Review</h2>
+            <span className="text-sm text-muted-foreground">
+              ({grouped.IN_REVIEW.length})
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.IN_REVIEW.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                id={campaign.id}
+                name={campaign.name}
+                purpose={campaign.purpose}
+                status={campaign.status}
+                metrics={campaign.metrics as any}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Ended Campaigns */}
+      {grouped.ENDED.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Archive className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+            <h2 className="text-2xl font-bold">Ended Campaigns</h2>
+            <span className="text-sm text-muted-foreground">
+              ({grouped.ENDED.length})
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.ENDED.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                id={campaign.id}
+                name={campaign.name}
+                purpose={campaign.purpose}
+                status={campaign.status}
+                metrics={campaign.metrics as any}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Empty State */}
+      {grouped.LIVE.length === 0 &&
+        grouped.IN_REVIEW.length === 0 &&
+        grouped.ENDED.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Rocket className="h-16 w-16 text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-bold mb-2">No campaigns yet</h2>
+            <p className="text-muted-foreground mb-4">
+              Get started by creating your first campaign
+            </p>
+          </div>
+        )}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      <Skeleton className="h-12 w-full" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-64" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-6">
+          <h1 className="text-4xl font-bold tracking-tight">Campaign Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage and monitor your credit card offers campaigns
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
     </div>
   );
 }
