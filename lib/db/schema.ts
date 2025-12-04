@@ -1,4 +1,15 @@
-import { pgTable, uuid, text, timestamp, boolean, jsonb, pgEnum } from "drizzle-orm/pg-core";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  jsonb,
+  pgEnum,
+  integer,
+  numeric,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Enums
@@ -17,7 +28,11 @@ export const offerTypeEnum = pgEnum("offer_type", [
   "BONUS",
 ]);
 
-export const segmentSourceEnum = pgEnum("segment_source", ["CDC", "RAHONA", "CUSTOM"]);
+export const segmentSourceEnum = pgEnum("segment_source", [
+  "CDC",
+  "RAHONA",
+  "CUSTOM",
+]);
 
 export const fulfillmentMethodEnum = pgEnum("fulfillment_method", [
   "REWARDS",
@@ -31,15 +46,155 @@ export const approvalDecisionEnum = pgEnum("approval_decision", [
   "PENDING",
 ]);
 
-export const controlResultEnum = pgEnum("control_result", ["PASS", "WARN", "FAIL"]);
+export const controlResultEnum = pgEnum("control_result", [
+  "PASS",
+  "WARN",
+  "FAIL",
+]);
+
+// New enums for account-level tracking
+export const accountTierEnum = pgEnum("account_tier", [
+  "STANDARD",
+  "GOLD",
+  "PLATINUM",
+  "DIAMOND",
+]);
+
+export const accountStatusEnum = pgEnum("account_status", [
+  "ACTIVE",
+  "SUSPENDED",
+  "CLOSED",
+]);
+
+export const enrollmentStatusEnum = pgEnum("enrollment_status", [
+  "ENROLLED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "EXPIRED",
+  "OPTED_OUT",
+]);
 
 // TypeScript types from enums
-export type CampaignStatus = "DRAFT" | "IN_REVIEW" | "TESTING" | "LIVE" | "ENDED";
+export type CampaignStatus =
+  | "DRAFT"
+  | "IN_REVIEW"
+  | "TESTING"
+  | "LIVE"
+  | "ENDED";
 export type OfferType = "POINTS_MULTIPLIER" | "CASHBACK" | "DISCOUNT" | "BONUS";
 export type SegmentSource = "CDC" | "RAHONA" | "CUSTOM";
-export type FulfillmentMethod = "REWARDS" | "STATEMENT_CREDIT" | "INCENTIVE_FILE";
+export type FulfillmentMethod =
+  | "REWARDS"
+  | "STATEMENT_CREDIT"
+  | "INCENTIVE_FILE";
 export type ApprovalDecision = "APPROVED" | "REJECTED" | "PENDING";
 export type ControlResult = "PASS" | "WARN" | "FAIL";
+export type AccountTier = "STANDARD" | "GOLD" | "PLATINUM" | "DIAMOND";
+export type AccountStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
+export type EnrollmentStatus =
+  | "ENROLLED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "EXPIRED"
+  | "OPTED_OUT";
+
+// ==========================================
+// ACCOUNT-LEVEL TABLES
+// ==========================================
+
+// Accounts - Core account entity with full details
+export const accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountNumber: text("account_number").notNull().unique(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  tier: accountTierEnum("tier").notNull().default("STANDARD"),
+  status: accountStatusEnum("status").notNull().default("ACTIVE"),
+  creditLimit: integer("credit_limit").notNull(), // in cents
+  currentBalance: integer("current_balance").notNull().default(0), // in cents
+  annualSpend: integer("annual_spend").notNull().default(0), // cached aggregate in cents
+  memberSince: timestamp("member_since").notNull(),
+  metadata: jsonb("metadata").default({}).$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Spending Groups - Groupings of accounts by spending behavior
+export const spendingGroups = pgTable("spending_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  criteria: jsonb("criteria").default({}).$type<{
+    minAnnualSpend?: number;
+    maxAnnualSpend?: number;
+    tiers?: AccountTier[];
+    categories?: string[];
+    minTransactions?: number;
+  }>(),
+  accountCount: integer("account_count").notNull().default(0), // cached count
+  avgSpend: integer("avg_spend").notNull().default(0), // cached average in cents
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Junction: Accounts to Spending Groups
+export const spendingGroupAccounts = pgTable("spending_group_accounts", {
+  spendingGroupId: uuid("spending_group_id")
+    .notNull()
+    .references(() => spendingGroups.id),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  score: integer("score"), // optional ranking within group
+});
+
+// Account Offer Enrollments - Tracks account enrollment in offers with progress
+export const accountOfferEnrollments = pgTable("account_offer_enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  offerId: uuid("offer_id")
+    .notNull()
+    .references(() => offers.id),
+  campaignId: uuid("campaign_id").references(() => campaigns.id), // nullable - which campaign enrolled them
+  status: enrollmentStatusEnum("status").notNull().default("ENROLLED"),
+  enrolledAt: timestamp("enrolled_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"), // nullable
+  targetAmount: integer("target_amount"), // e.g., $1000 in cents
+  currentProgress: integer("current_progress").notNull().default(0), // cached progress amount in cents
+  progressPct: numeric("progress_pct", { precision: 5, scale: 2 })
+    .notNull()
+    .default("0"), // calculated percentage
+  completedAt: timestamp("completed_at"), // nullable
+  rewardEarned: integer("reward_earned"), // nullable, in cents
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Account Transactions - Individual transactions for progress tracking
+export const accountTransactions = pgTable("account_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  enrollmentId: uuid("enrollment_id").references(
+    () => accountOfferEnrollments.id
+  ), // nullable - links to specific offer enrollment
+  transactionDate: timestamp("transaction_date").notNull(),
+  merchant: text("merchant").notNull(),
+  category: text("category").notNull(),
+  amount: integer("amount").notNull(), // in cents
+  qualifiesForOffer: boolean("qualifies_for_offer").notNull().default(false),
+  metadata: jsonb("metadata").default({}).$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ==========================================
+// CAMPAIGN & OFFER TABLES
+// ==========================================
 
 // Tables
 export const campaigns = pgTable("campaigns", {
@@ -70,6 +225,16 @@ export const offers = pgTable("offers", {
   type: offerTypeEnum("type").notNull(),
   vendor: text("vendor"),
   parameters: jsonb("parameters").default({}).$type<Record<string, any>>(),
+  // Progress tracking fields
+  hasProgressTracking: boolean("has_progress_tracking")
+    .notNull()
+    .default(false),
+  progressTarget: jsonb("progress_target").default(null).$type<{
+    targetAmount?: number; // in cents
+    category?: string;
+    vendor?: string;
+    timeframeDays?: number;
+  } | null>(),
   effectiveFrom: timestamp("effective_from"),
   effectiveTo: timestamp("effective_to"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -80,7 +245,9 @@ export const segments = pgTable("segments", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   source: segmentSourceEnum("source").notNull(),
-  definitionJson: jsonb("definition_json").default({}).$type<Record<string, any>>(),
+  definitionJson: jsonb("definition_json")
+    .default({})
+    .$type<Record<string, any>>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -94,9 +261,9 @@ export const eligibilityRules = pgTable("eligibility_rules", {
 export const channelPlans = pgTable("channel_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
   channels: jsonb("channels").default([]).$type<string[]>(),
-  creatives: jsonb("creatives").default([]).$type<
-    Array<{ channel: string; preview: string }>
-  >(),
+  creatives: jsonb("creatives")
+    .default([])
+    .$type<Array<{ channel: string; preview: string }>>(),
   dynamicTnc: text("dynamic_tnc"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -110,9 +277,11 @@ export const fulfillmentPlans = pgTable("fulfillment_plans", {
 
 export const controlChecklists = pgTable("control_checklists", {
   id: uuid("id").primaryKey().defaultRandom(),
-  items: jsonb("items").default([]).$type<
-    Array<{ name: string; result: ControlResult; evidence_ref?: string }>
-  >(),
+  items: jsonb("items")
+    .default([])
+    .$type<
+      Array<{ name: string; result: ControlResult; evidence_ref?: string }>
+    >(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -141,11 +310,17 @@ export const simulationRuns = pgTable("simulation_runs", {
     error_rate_pct?: number;
   }>(),
   steps: jsonb("steps").default([]).$type<
-    Array<{ key: string; label: string; status: "PENDING" | "RUNNING" | "DONE" | "FAIL" }>
+    Array<{
+      key: string;
+      label: string;
+      status: "PENDING" | "RUNNING" | "DONE" | "FAIL";
+    }>
   >(),
   finished: boolean("finished").notNull().default(false),
   success: boolean("success").default(false),
-  errors: jsonb("errors").default([]).$type<Array<{ message: string; step?: string }>>(),
+  errors: jsonb("errors")
+    .default([])
+    .$type<Array<{ message: string; step?: string }>>(),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   finishedAt: timestamp("finished_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -188,6 +363,20 @@ export const campaignEligibilityRules = pgTable("campaign_eligibility_rules", {
     .references(() => eligibilityRules.id),
 });
 
+// Junction: Segments reference Spending Groups
+export const segmentSpendingGroups = pgTable("segment_spending_groups", {
+  segmentId: uuid("segment_id")
+    .notNull()
+    .references(() => segments.id),
+  spendingGroupId: uuid("spending_group_id")
+    .notNull()
+    .references(() => spendingGroups.id),
+});
+
+// ==========================================
+// RELATIONS
+// ==========================================
+
 // Relations
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   campaignOffers: many(campaignOffers),
@@ -196,6 +385,7 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   approvals: many(approvals),
   simulationRuns: many(simulationRuns),
   auditLogs: many(auditLogs),
+  accountOfferEnrollments: many(accountOfferEnrollments),
   channelPlan: one(channelPlans, {
     fields: [campaigns.channelPlanId],
     references: [channelPlans.id],
@@ -212,15 +402,96 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
 
 export const offersRelations = relations(offers, ({ many }) => ({
   campaignOffers: many(campaignOffers),
+  accountOfferEnrollments: many(accountOfferEnrollments),
 }));
 
 export const segmentsRelations = relations(segments, ({ many }) => ({
   campaignSegments: many(campaignSegments),
+  segmentSpendingGroups: many(segmentSpendingGroups),
 }));
 
-export const eligibilityRulesRelations = relations(eligibilityRules, ({ many }) => ({
-  campaignEligibilityRules: many(campaignEligibilityRules),
+// Account-level relations
+export const accountsRelations = relations(accounts, ({ many }) => ({
+  spendingGroupAccounts: many(spendingGroupAccounts),
+  accountOfferEnrollments: many(accountOfferEnrollments),
+  accountTransactions: many(accountTransactions),
 }));
+
+export const spendingGroupsRelations = relations(
+  spendingGroups,
+  ({ many }) => ({
+    spendingGroupAccounts: many(spendingGroupAccounts),
+    segmentSpendingGroups: many(segmentSpendingGroups),
+  })
+);
+
+export const spendingGroupAccountsRelations = relations(
+  spendingGroupAccounts,
+  ({ one }) => ({
+    spendingGroup: one(spendingGroups, {
+      fields: [spendingGroupAccounts.spendingGroupId],
+      references: [spendingGroups.id],
+    }),
+    account: one(accounts, {
+      fields: [spendingGroupAccounts.accountId],
+      references: [accounts.id],
+    }),
+  })
+);
+
+export const segmentSpendingGroupsRelations = relations(
+  segmentSpendingGroups,
+  ({ one }) => ({
+    segment: one(segments, {
+      fields: [segmentSpendingGroups.segmentId],
+      references: [segments.id],
+    }),
+    spendingGroup: one(spendingGroups, {
+      fields: [segmentSpendingGroups.spendingGroupId],
+      references: [spendingGroups.id],
+    }),
+  })
+);
+
+export const accountOfferEnrollmentsRelations = relations(
+  accountOfferEnrollments,
+  ({ one, many }) => ({
+    account: one(accounts, {
+      fields: [accountOfferEnrollments.accountId],
+      references: [accounts.id],
+    }),
+    offer: one(offers, {
+      fields: [accountOfferEnrollments.offerId],
+      references: [offers.id],
+    }),
+    campaign: one(campaigns, {
+      fields: [accountOfferEnrollments.campaignId],
+      references: [campaigns.id],
+    }),
+    transactions: many(accountTransactions),
+  })
+);
+
+export const accountTransactionsRelations = relations(
+  accountTransactions,
+  ({ one }) => ({
+    account: one(accounts, {
+      fields: [accountTransactions.accountId],
+      references: [accounts.id],
+    }),
+    enrollment: one(accountOfferEnrollments, {
+      fields: [accountTransactions.enrollmentId],
+      references: [accountOfferEnrollments.id],
+    }),
+  })
+);
+
+export const eligibilityRulesRelations = relations(
+  eligibilityRules,
+  ({ many }) => ({
+    campaignEligibilityRules: many(campaignEligibilityRules),
+  })
+);
 
 export const campaignOffersRelations = relations(campaignOffers, ({ one }) => ({
   campaign: one(campaigns, {
@@ -233,16 +504,19 @@ export const campaignOffersRelations = relations(campaignOffers, ({ one }) => ({
   }),
 }));
 
-export const campaignSegmentsRelations = relations(campaignSegments, ({ one }) => ({
-  campaign: one(campaigns, {
-    fields: [campaignSegments.campaignId],
-    references: [campaigns.id],
-  }),
-  segment: one(segments, {
-    fields: [campaignSegments.segmentId],
-    references: [segments.id],
-  }),
-}));
+export const campaignSegmentsRelations = relations(
+  campaignSegments,
+  ({ one }) => ({
+    campaign: one(campaigns, {
+      fields: [campaignSegments.campaignId],
+      references: [campaigns.id],
+    }),
+    segment: one(segments, {
+      fields: [campaignSegments.segmentId],
+      references: [segments.id],
+    }),
+  })
+);
 
 export const campaignEligibilityRulesRelations = relations(
   campaignEligibilityRules,
@@ -278,4 +552,3 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     references: [campaigns.id],
   }),
 }));
-

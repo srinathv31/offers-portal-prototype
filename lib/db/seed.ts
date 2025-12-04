@@ -1,12 +1,21 @@
 import { db } from "./index";
 import * as schema from "./schema";
-import { eq } from "drizzle-orm";
 
 async function seed() {
   console.log("🌱 Starting database seed...");
 
   // Clear existing data (in reverse order of dependencies)
   console.log("Clearing existing data...");
+
+  // Clear account-level data first
+  await db.delete(schema.accountTransactions);
+  await db.delete(schema.accountOfferEnrollments);
+  await db.delete(schema.spendingGroupAccounts);
+  await db.delete(schema.segmentSpendingGroups);
+  await db.delete(schema.spendingGroups);
+  await db.delete(schema.accounts);
+
+  // Clear campaign data
   await db.delete(schema.auditLogs);
   await db.delete(schema.simulationRuns);
   await db.delete(schema.approvals);
@@ -34,6 +43,12 @@ async function seed() {
         category: "Online Shopping",
         minPurchase: 25,
       },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 100000, // $1000 in cents
+        vendor: "Amazon",
+        timeframeDays: 90,
+      },
     },
     {
       name: "Target 5% Weekend",
@@ -44,6 +59,12 @@ async function seed() {
         daysOfWeek: ["Saturday", "Sunday"],
         maxCashback: 50,
       },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 50000, // $500 in cents
+        vendor: "Target",
+        timeframeDays: 60,
+      },
     },
     {
       name: "Starbucks Bonus",
@@ -53,6 +74,12 @@ async function seed() {
         bonusPoints: 500,
         minSpend: 50,
         timeframe: "30 days",
+      },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 5000, // $50 in cents
+        vendor: "Starbucks",
+        timeframeDays: 30,
       },
     },
     {
@@ -65,6 +92,12 @@ async function seed() {
         recurring: true,
         minMonthlySpend: 100,
       },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 30000, // $300 in cents per month
+        category: "Groceries",
+        timeframeDays: 30,
+      },
     },
     {
       name: "Travel Miles Accelerator",
@@ -76,6 +109,12 @@ async function seed() {
         includesAirlines: true,
         includesHotels: true,
       },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 200000, // $2000 in cents
+        category: "Travel",
+        timeframeDays: 120,
+      },
     },
     {
       name: "Dining Cashback",
@@ -86,6 +125,8 @@ async function seed() {
         category: "Dining",
         maxCashback: 75,
       },
+      hasProgressTracking: false,
+      progressTarget: null,
     },
     {
       name: "Gas Station Rewards",
@@ -96,6 +137,8 @@ async function seed() {
         category: "Gas Stations",
         maxPointsPerMonth: 5000,
       },
+      hasProgressTracking: false,
+      progressTarget: null,
     },
     {
       name: "Fitness Membership Discount",
@@ -106,10 +149,19 @@ async function seed() {
         category: "Fitness",
         validVendors: ["Nike", "Adidas", "Lululemon"],
       },
+      hasProgressTracking: true,
+      progressTarget: {
+        targetAmount: 25000, // $250 in cents
+        vendor: "Nike",
+        timeframeDays: 60,
+      },
     },
   ];
 
-  const createdOffers = await db.insert(schema.offers).values(offersData).returning();
+  const createdOffers = await db
+    .insert(schema.offers)
+    .values(offersData)
+    .returning();
   console.log(`✓ Created ${createdOffers.length} offers`);
 
   // Create segments
@@ -153,7 +205,10 @@ async function seed() {
     },
   ];
 
-  const createdSegments = await db.insert(schema.segments).values(segmentsData).returning();
+  const createdSegments = await db
+    .insert(schema.segments)
+    .values(segmentsData)
+    .returning();
   console.log(`✓ Created ${createdSegments.length} segments`);
 
   // Create eligibility rules
@@ -161,15 +216,26 @@ async function seed() {
   const rulesData = [
     {
       dsl: "(account.status == 'ACTIVE') AND (account.delinquency_days < 30) AND (credit_score >= 650)",
-      dataDependencies: ["account.status", "account.delinquency_days", "credit_score"],
+      dataDependencies: [
+        "account.status",
+        "account.delinquency_days",
+        "credit_score",
+      ],
     },
     {
       dsl: "(account.tenure_months >= 6) AND (account.avg_monthly_spend >= 500) AND (opt_in.marketing == true)",
-      dataDependencies: ["account.tenure_months", "account.avg_monthly_spend", "opt_in.marketing"],
+      dataDependencies: [
+        "account.tenure_months",
+        "account.avg_monthly_spend",
+        "opt_in.marketing",
+      ],
     },
   ];
 
-  const createdRules = await db.insert(schema.eligibilityRules).values(rulesData).returning();
+  const createdRules = await db
+    .insert(schema.eligibilityRules)
+    .values(rulesData)
+    .returning();
   console.log(`✓ Created ${createdRules.length} eligibility rules`);
 
   // Create channel plan
@@ -179,18 +245,21 @@ async function seed() {
     creatives: [
       {
         channel: "EMAIL",
-        preview: "Holiday rewards are here! Earn 3× points on your favorite brands.",
+        preview:
+          "Holiday rewards are here! Earn 3× points on your favorite brands.",
       },
       {
         channel: "MOBILE",
-        preview: "🎁 Special Holiday Offer: Triple points on Amazon, Target & more!",
+        preview:
+          "🎁 Special Holiday Offer: Triple points on Amazon, Target & more!",
       },
       {
         channel: "WEB",
         preview: "Banner: Exclusive Holiday Rewards - Limited Time Only",
       },
     ],
-    dynamicTnc: "Offer valid through 12/31/2025. Points earned will post within 2 billing cycles. See full terms at example.com/terms.",
+    dynamicTnc:
+      "Offer valid through 12/31/2025. Points earned will post within 2 billing cycles. See full terms at example.com/terms.",
   };
 
   const [createdChannelPlan] = await db
@@ -291,9 +360,11 @@ async function seed() {
   ]);
 
   // Link eligibility rules to campaign 1
-  await db.insert(schema.campaignEligibilityRules).values([
-    { campaignId: campaign1.id, eligibilityRuleId: createdRules[0].id },
-  ]);
+  await db
+    .insert(schema.campaignEligibilityRules)
+    .values([
+      { campaignId: campaign1.id, eligibilityRuleId: createdRules[0].id },
+    ]);
 
   // Create approvals for campaign 1
   await db.insert(schema.approvals).values([
@@ -395,7 +466,8 @@ async function seed() {
     .insert(schema.campaigns)
     .values({
       name: "Summer Cashback",
-      purpose: "Summer promotional campaign with focus on groceries, gas, and fitness rewards",
+      purpose:
+        "Summer promotional campaign with focus on groceries, gas, and fitness rewards",
       status: "ENDED",
       startDate: new Date("2025-06-01"),
       endDate: new Date("2025-08-31"),
@@ -426,9 +498,11 @@ async function seed() {
   ]);
 
   // Link eligibility rules to campaign 3
-  await db.insert(schema.campaignEligibilityRules).values([
-    { campaignId: campaign3.id, eligibilityRuleId: createdRules[0].id },
-  ]);
+  await db
+    .insert(schema.campaignEligibilityRules)
+    .values([
+      { campaignId: campaign3.id, eligibilityRuleId: createdRules[0].id },
+    ]);
 
   // Create approvals for campaign 3 (all approved)
   await db.insert(schema.approvals).values([
@@ -509,9 +583,21 @@ async function seed() {
     },
     steps: [
       { key: "rules-compile", label: "Rules Compilation", status: "DONE" },
-      { key: "data-availability", label: "Data Availability Check", status: "DONE" },
-      { key: "channel-mock", label: "Channel Distribution Mock", status: "DONE" },
-      { key: "presentment", label: "Offer Presentment Simulation", status: "DONE" },
+      {
+        key: "data-availability",
+        label: "Data Availability Check",
+        status: "DONE",
+      },
+      {
+        key: "channel-mock",
+        label: "Channel Distribution Mock",
+        status: "DONE",
+      },
+      {
+        key: "presentment",
+        label: "Offer Presentment Simulation",
+        status: "DONE",
+      },
       { key: "disposition", label: "Disposition Processing", status: "DONE" },
       { key: "fulfillment", label: "Fulfillment Simulation", status: "DONE" },
       { key: "report", label: "Report Generation", status: "DONE" },
@@ -525,6 +611,1224 @@ async function seed() {
 
   console.log("✓ Created simulation run");
 
+  // ==========================================
+  // ACCOUNT-LEVEL DATA
+  // ==========================================
+
+  // Create mock accounts (20 accounts)
+  console.log("Creating accounts...");
+  const accountsData = [
+    // DIAMOND tier (4 accounts)
+    {
+      accountNumber: "ACCT-001-DIAMOND",
+      firstName: "Victoria",
+      lastName: "Sterling",
+      email: "victoria.sterling@email.com",
+      tier: "DIAMOND" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 5000000, // $50,000
+      currentBalance: 1250000, // $12,500
+      annualSpend: 15000000, // $150,000
+      memberSince: new Date("2018-03-15"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-002-DIAMOND",
+      firstName: "Alexander",
+      lastName: "Chen",
+      email: "alex.chen@email.com",
+      tier: "DIAMOND" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 4500000, // $45,000
+      currentBalance: 890000, // $8,900
+      annualSpend: 12500000, // $125,000
+      memberSince: new Date("2019-01-10"),
+      metadata: { preferredChannel: "MOBILE", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-003-DIAMOND",
+      firstName: "Isabella",
+      lastName: "Rodriguez",
+      email: "isabella.r@email.com",
+      tier: "DIAMOND" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 4000000, // $40,000
+      currentBalance: 2100000, // $21,000
+      annualSpend: 11000000, // $110,000
+      memberSince: new Date("2017-06-22"),
+      metadata: { preferredChannel: "EMAIL", language: "es" },
+    },
+    {
+      accountNumber: "ACCT-004-DIAMOND",
+      firstName: "William",
+      lastName: "Park",
+      email: "will.park@email.com",
+      tier: "DIAMOND" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 3500000, // $35,000
+      currentBalance: 450000, // $4,500
+      annualSpend: 9500000, // $95,000
+      memberSince: new Date("2020-02-28"),
+      metadata: { preferredChannel: "WEB", language: "en" },
+    },
+    // PLATINUM tier (5 accounts)
+    {
+      accountNumber: "ACCT-005-PLATINUM",
+      firstName: "Sophia",
+      lastName: "Williams",
+      email: "sophia.w@email.com",
+      tier: "PLATINUM" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 2500000, // $25,000
+      currentBalance: 780000, // $7,800
+      annualSpend: 7500000, // $75,000
+      memberSince: new Date("2020-08-14"),
+      metadata: { preferredChannel: "MOBILE", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-006-PLATINUM",
+      firstName: "James",
+      lastName: "Thompson",
+      email: "james.t@email.com",
+      tier: "PLATINUM" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 2200000, // $22,000
+      currentBalance: 560000, // $5,600
+      annualSpend: 6200000, // $62,000
+      memberSince: new Date("2021-03-05"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-007-PLATINUM",
+      firstName: "Emma",
+      lastName: "Davis",
+      email: "emma.davis@email.com",
+      tier: "PLATINUM" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 2000000, // $20,000
+      currentBalance: 920000, // $9,200
+      annualSpend: 5800000, // $58,000
+      memberSince: new Date("2019-11-20"),
+      metadata: { preferredChannel: "WEB", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-008-PLATINUM",
+      firstName: "Daniel",
+      lastName: "Martinez",
+      email: "daniel.m@email.com",
+      tier: "PLATINUM" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 1800000, // $18,000
+      currentBalance: 340000, // $3,400
+      annualSpend: 4500000, // $45,000
+      memberSince: new Date("2022-01-15"),
+      metadata: { preferredChannel: "MOBILE", language: "es" },
+    },
+    {
+      accountNumber: "ACCT-009-PLATINUM",
+      firstName: "Olivia",
+      lastName: "Anderson",
+      email: "olivia.a@email.com",
+      tier: "PLATINUM" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 1500000, // $15,000
+      currentBalance: 1100000, // $11,000
+      annualSpend: 4200000, // $42,000
+      memberSince: new Date("2021-07-08"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    // GOLD tier (6 accounts)
+    {
+      accountNumber: "ACCT-010-GOLD",
+      firstName: "Michael",
+      lastName: "Johnson",
+      email: "michael.j@email.com",
+      tier: "GOLD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 1200000, // $12,000
+      currentBalance: 450000, // $4,500
+      annualSpend: 3200000, // $32,000
+      memberSince: new Date("2022-04-12"),
+      metadata: { preferredChannel: "MOBILE", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-011-GOLD",
+      firstName: "Ava",
+      lastName: "Brown",
+      email: "ava.brown@email.com",
+      tier: "GOLD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 1000000, // $10,000
+      currentBalance: 280000, // $2,800
+      annualSpend: 2800000, // $28,000
+      memberSince: new Date("2021-09-30"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-012-GOLD",
+      firstName: "Ethan",
+      lastName: "Wilson",
+      email: "ethan.w@email.com",
+      tier: "GOLD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 900000, // $9,000
+      currentBalance: 650000, // $6,500
+      annualSpend: 2400000, // $24,000
+      memberSince: new Date("2023-02-18"),
+      metadata: { preferredChannel: "WEB", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-013-GOLD",
+      firstName: "Mia",
+      lastName: "Taylor",
+      email: "mia.t@email.com",
+      tier: "GOLD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 800000, // $8,000
+      currentBalance: 190000, // $1,900
+      annualSpend: 2100000, // $21,000
+      memberSince: new Date("2022-11-05"),
+      metadata: { preferredChannel: "MOBILE", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-014-GOLD",
+      firstName: "Benjamin",
+      lastName: "Moore",
+      email: "ben.moore@email.com",
+      tier: "GOLD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 750000, // $7,500
+      currentBalance: 320000, // $3,200
+      annualSpend: 1800000, // $18,000
+      memberSince: new Date("2023-05-22"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-015-GOLD",
+      firstName: "Charlotte",
+      lastName: "Garcia",
+      email: "charlotte.g@email.com",
+      tier: "GOLD" as const,
+      status: "SUSPENDED" as const,
+      creditLimit: 700000, // $7,000
+      currentBalance: 680000, // $6,800
+      annualSpend: 1500000, // $15,000
+      memberSince: new Date("2021-12-01"),
+      metadata: {
+        preferredChannel: "MOBILE",
+        suspensionReason: "payment_review",
+      },
+    },
+    // STANDARD tier (5 accounts)
+    {
+      accountNumber: "ACCT-016-STANDARD",
+      firstName: "Lucas",
+      lastName: "Lee",
+      email: "lucas.lee@email.com",
+      tier: "STANDARD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 500000, // $5,000
+      currentBalance: 120000, // $1,200
+      annualSpend: 850000, // $8,500
+      memberSince: new Date("2024-01-10"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-017-STANDARD",
+      firstName: "Amelia",
+      lastName: "Harris",
+      email: "amelia.h@email.com",
+      tier: "STANDARD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 450000, // $4,500
+      currentBalance: 85000, // $850
+      annualSpend: 650000, // $6,500
+      memberSince: new Date("2024-03-25"),
+      metadata: { preferredChannel: "MOBILE", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-018-STANDARD",
+      firstName: "Henry",
+      lastName: "Clark",
+      email: "henry.c@email.com",
+      tier: "STANDARD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 400000, // $4,000
+      currentBalance: 210000, // $2,100
+      annualSpend: 480000, // $4,800
+      memberSince: new Date("2024-06-15"),
+      metadata: { preferredChannel: "WEB", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-019-STANDARD",
+      firstName: "Harper",
+      lastName: "Lewis",
+      email: "harper.l@email.com",
+      tier: "STANDARD" as const,
+      status: "ACTIVE" as const,
+      creditLimit: 350000, // $3,500
+      currentBalance: 55000, // $550
+      annualSpend: 320000, // $3,200
+      memberSince: new Date("2024-08-01"),
+      metadata: { preferredChannel: "EMAIL", language: "en" },
+    },
+    {
+      accountNumber: "ACCT-020-STANDARD",
+      firstName: "Sebastian",
+      lastName: "Walker",
+      email: "sebastian.w@email.com",
+      tier: "STANDARD" as const,
+      status: "CLOSED" as const,
+      creditLimit: 300000, // $3,000
+      currentBalance: 0,
+      annualSpend: 200000, // $2,000
+      memberSince: new Date("2023-09-10"),
+      metadata: {
+        preferredChannel: "MOBILE",
+        closedReason: "customer_request",
+      },
+    },
+  ];
+
+  const createdAccounts = await db
+    .insert(schema.accounts)
+    .values(accountsData)
+    .returning();
+  console.log(`✓ Created ${createdAccounts.length} accounts`);
+
+  // Create spending groups (5 groups)
+  console.log("Creating spending groups...");
+  const spendingGroupsData = [
+    {
+      name: "Premium Travelers",
+      description:
+        "High travel spend customers, primarily PLATINUM/DIAMOND tier members who travel frequently",
+      criteria: {
+        minAnnualSpend: 4000000, // $40,000
+        tiers: ["PLATINUM" as const, "DIAMOND" as const],
+        categories: ["Travel", "Airlines", "Hotels"],
+      },
+      accountCount: 6,
+      avgSpend: 9500000, // $95,000
+    },
+    {
+      name: "Everyday Essentials",
+      description: "Customers focused on groceries and gas station spending",
+      criteria: {
+        minAnnualSpend: 500000, // $5,000
+        categories: ["Groceries", "Gas Stations"],
+        minTransactions: 20,
+      },
+      accountCount: 10,
+      avgSpend: 2500000, // $25,000
+    },
+    {
+      name: "Online Shoppers",
+      description: "Heavy Amazon and online retail users",
+      criteria: {
+        categories: ["Online Shopping", "Amazon"],
+        minTransactions: 15,
+      },
+      accountCount: 8,
+      avgSpend: 3200000, // $32,000
+    },
+    {
+      name: "Dining Enthusiasts",
+      description: "Restaurant and dining focused spenders",
+      criteria: {
+        categories: ["Dining", "Restaurants", "Food Delivery"],
+        minAnnualSpend: 300000, // $3,000
+      },
+      accountCount: 12,
+      avgSpend: 1800000, // $18,000
+    },
+    {
+      name: "High Value Customers",
+      description: "Top 10% overall spend - most valuable customers",
+      criteria: {
+        minAnnualSpend: 7500000, // $75,000
+        tiers: ["PLATINUM" as const, "DIAMOND" as const],
+      },
+      accountCount: 5,
+      avgSpend: 11000000, // $110,000
+    },
+  ];
+
+  const createdSpendingGroups = await db
+    .insert(schema.spendingGroups)
+    .values(spendingGroupsData)
+    .returning();
+  console.log(`✓ Created ${createdSpendingGroups.length} spending groups`);
+
+  // Link accounts to spending groups
+  console.log("Linking accounts to spending groups...");
+  const spendingGroupAccountsData = [
+    // Premium Travelers - DIAMOND and PLATINUM high spenders
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[0].id,
+      score: 100,
+    }, // Victoria (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[1].id,
+      score: 95,
+    }, // Alexander (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[2].id,
+      score: 90,
+    }, // Isabella (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[4].id,
+      score: 85,
+    }, // Sophia (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[5].id,
+      score: 80,
+    }, // James (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[6].id,
+      score: 75,
+    }, // Emma (PLATINUM)
+
+    // Everyday Essentials - mix of tiers, groceries focus
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[9].id,
+      score: 90,
+    }, // Michael (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[10].id,
+      score: 85,
+    }, // Ava (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[11].id,
+      score: 80,
+    }, // Ethan (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[12].id,
+      score: 75,
+    }, // Mia (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[15].id,
+      score: 70,
+    }, // Lucas (STANDARD)
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[16].id,
+      score: 65,
+    }, // Amelia (STANDARD)
+
+    // Online Shoppers - Amazon heavy users
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[3].id,
+      score: 95,
+    }, // William (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[7].id,
+      score: 90,
+    }, // Daniel (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[8].id,
+      score: 85,
+    }, // Olivia (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[13].id,
+      score: 80,
+    }, // Benjamin (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[17].id,
+      score: 70,
+    }, // Henry (STANDARD)
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[18].id,
+      score: 65,
+    }, // Harper (STANDARD)
+
+    // Dining Enthusiasts - restaurant spenders
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[1].id,
+      score: 90,
+    }, // Alexander (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[4].id,
+      score: 85,
+    }, // Sophia (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[6].id,
+      score: 80,
+    }, // Emma (PLATINUM)
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[10].id,
+      score: 75,
+    }, // Ava (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[12].id,
+      score: 70,
+    }, // Mia (GOLD)
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[16].id,
+      score: 65,
+    }, // Amelia (STANDARD)
+
+    // High Value Customers - top spenders only
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[0].id,
+      score: 100,
+    }, // Victoria (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[1].id,
+      score: 95,
+    }, // Alexander (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[2].id,
+      score: 90,
+    }, // Isabella (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[3].id,
+      score: 85,
+    }, // William (DIAMOND)
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[4].id,
+      score: 80,
+    }, // Sophia (PLATINUM)
+  ];
+
+  await db
+    .insert(schema.spendingGroupAccounts)
+    .values(spendingGroupAccountsData);
+  console.log(`✓ Linked accounts to spending groups`);
+
+  // Link segments to spending groups
+  console.log("Linking segments to spending groups...");
+  const segmentSpendingGroupsData = [
+    // Holiday High Spenders -> High Value Customers
+    {
+      segmentId: createdSegments[0].id,
+      spendingGroupId: createdSpendingGroups[4].id,
+    },
+    // Amazon Enthusiasts -> Online Shoppers
+    {
+      segmentId: createdSegments[1].id,
+      spendingGroupId: createdSpendingGroups[2].id,
+    },
+    // Travel Frequent Flyers -> Premium Travelers
+    {
+      segmentId: createdSegments[2].id,
+      spendingGroupId: createdSpendingGroups[0].id,
+    },
+  ];
+
+  await db
+    .insert(schema.segmentSpendingGroups)
+    .values(segmentSpendingGroupsData);
+  console.log(`✓ Linked segments to spending groups`);
+
+  // Create account offer enrollments with varying progress
+  console.log("Creating account offer enrollments...");
+
+  // Helper to calculate progress percentage
+  const calcProgressPct = (current: number, target: number) =>
+    Math.min(100, Math.round((current / target) * 10000) / 100).toString();
+
+  const enrollmentsData = [
+    // Amazon 3× Points enrollments (offer 0) - target $1000
+    {
+      accountId: createdAccounts[0].id, // Victoria
+      offerId: createdOffers[0].id,
+      campaignId: campaign1.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-11-01"),
+      expiresAt: new Date("2026-01-29"),
+      targetAmount: 100000, // $1000
+      currentProgress: 100000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-11-28"),
+      rewardEarned: 3000, // 3000 bonus points
+    },
+    {
+      accountId: createdAccounts[1].id, // Alexander
+      offerId: createdOffers[0].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-02"),
+      expiresAt: new Date("2026-01-30"),
+      targetAmount: 100000,
+      currentProgress: 78500, // $785
+      progressPct: "78.50",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[3].id, // William
+      offerId: createdOffers[0].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-05"),
+      expiresAt: new Date("2026-02-02"),
+      targetAmount: 100000,
+      currentProgress: 45200, // $452
+      progressPct: "45.20",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[7].id, // Daniel
+      offerId: createdOffers[0].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-10"),
+      expiresAt: new Date("2026-02-07"),
+      targetAmount: 100000,
+      currentProgress: 12300, // $123 - just started
+      progressPct: "12.30",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[13].id, // Benjamin
+      offerId: createdOffers[0].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-15"),
+      expiresAt: new Date("2026-02-12"),
+      targetAmount: 100000,
+      currentProgress: 91500, // $915 - near completion
+      progressPct: "91.50",
+      completedAt: null,
+      rewardEarned: null,
+    },
+
+    // Target 5% Weekend enrollments (offer 1) - target $500
+    {
+      accountId: createdAccounts[2].id, // Isabella
+      offerId: createdOffers[1].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-01"),
+      expiresAt: new Date("2025-12-31"),
+      targetAmount: 50000,
+      currentProgress: 32500, // $325
+      progressPct: "65.00",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[4].id, // Sophia
+      offerId: createdOffers[1].id,
+      campaignId: campaign1.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-11-03"),
+      expiresAt: new Date("2026-01-01"),
+      targetAmount: 50000,
+      currentProgress: 50000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-11-25"),
+      rewardEarned: 2500, // $25 cashback
+    },
+    {
+      accountId: createdAccounts[9].id, // Michael
+      offerId: createdOffers[1].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-08"),
+      expiresAt: new Date("2026-01-06"),
+      targetAmount: 50000,
+      currentProgress: 18700, // $187
+      progressPct: "37.40",
+      completedAt: null,
+      rewardEarned: null,
+    },
+
+    // Starbucks Bonus enrollments (offer 2) - target $50
+    {
+      accountId: createdAccounts[5].id, // James
+      offerId: createdOffers[2].id,
+      campaignId: campaign1.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-11-01"),
+      expiresAt: new Date("2025-12-01"),
+      targetAmount: 5000,
+      currentProgress: 5000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-11-12"),
+      rewardEarned: 500, // 500 bonus points
+    },
+    {
+      accountId: createdAccounts[6].id, // Emma
+      offerId: createdOffers[2].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-05"),
+      expiresAt: new Date("2025-12-05"),
+      targetAmount: 5000,
+      currentProgress: 3200, // $32
+      progressPct: "64.00",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[10].id, // Ava
+      offerId: createdOffers[2].id,
+      campaignId: campaign1.id,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-11-10"),
+      expiresAt: new Date("2025-12-10"),
+      targetAmount: 5000,
+      currentProgress: 1500, // $15
+      progressPct: "30.00",
+      completedAt: null,
+      rewardEarned: null,
+    },
+
+    // Recurring Groceries enrollments (offer 3) - target $300/month
+    {
+      accountId: createdAccounts[9].id, // Michael
+      offerId: createdOffers[3].id,
+      campaignId: campaign3.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-06-01"),
+      expiresAt: new Date("2025-08-31"),
+      targetAmount: 30000,
+      currentProgress: 30000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-06-25"),
+      rewardEarned: 600, // 2× points
+    },
+    {
+      accountId: createdAccounts[10].id, // Ava
+      offerId: createdOffers[3].id,
+      campaignId: campaign3.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-06-01"),
+      expiresAt: new Date("2025-08-31"),
+      targetAmount: 30000,
+      currentProgress: 30000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-06-28"),
+      rewardEarned: 600,
+    },
+    {
+      accountId: createdAccounts[15].id, // Lucas
+      offerId: createdOffers[3].id,
+      campaignId: campaign3.id,
+      status: "EXPIRED" as const,
+      enrolledAt: new Date("2025-06-15"),
+      expiresAt: new Date("2025-07-15"),
+      targetAmount: 30000,
+      currentProgress: 22000, // $220
+      progressPct: "73.33",
+      completedAt: null,
+      rewardEarned: null,
+    },
+
+    // Travel Miles Accelerator enrollments (offer 4) - target $2000
+    {
+      accountId: createdAccounts[0].id, // Victoria
+      offerId: createdOffers[4].id,
+      campaignId: null, // Not from a campaign
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-09-01"),
+      expiresAt: new Date("2025-12-29"),
+      targetAmount: 200000,
+      currentProgress: 156000, // $1,560
+      progressPct: "78.00",
+      completedAt: null,
+      rewardEarned: null,
+    },
+    {
+      accountId: createdAccounts[1].id, // Alexander
+      offerId: createdOffers[4].id,
+      campaignId: null,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-08-15"),
+      expiresAt: new Date("2025-12-12"),
+      targetAmount: 200000,
+      currentProgress: 200000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-11-20"),
+      rewardEarned: 10000, // 10,000 bonus miles
+    },
+    {
+      accountId: createdAccounts[4].id, // Sophia
+      offerId: createdOffers[4].id,
+      campaignId: null,
+      status: "IN_PROGRESS" as const,
+      enrolledAt: new Date("2025-10-01"),
+      expiresAt: new Date("2026-01-28"),
+      targetAmount: 200000,
+      currentProgress: 85000, // $850
+      progressPct: "42.50",
+      completedAt: null,
+      rewardEarned: null,
+    },
+
+    // Fitness Membership Discount enrollments (offer 7) - target $250
+    {
+      accountId: createdAccounts[5].id, // James
+      offerId: createdOffers[7].id,
+      campaignId: campaign3.id,
+      status: "COMPLETED" as const,
+      enrolledAt: new Date("2025-06-01"),
+      expiresAt: new Date("2025-07-31"),
+      targetAmount: 25000,
+      currentProgress: 25000,
+      progressPct: "100.00",
+      completedAt: new Date("2025-07-15"),
+      rewardEarned: 3750, // 15% discount
+    },
+    {
+      accountId: createdAccounts[11].id, // Ethan
+      offerId: createdOffers[7].id,
+      campaignId: campaign3.id,
+      status: "OPTED_OUT" as const,
+      enrolledAt: new Date("2025-06-05"),
+      expiresAt: new Date("2025-08-03"),
+      targetAmount: 25000,
+      currentProgress: 5000, // $50
+      progressPct: "20.00",
+      completedAt: null,
+      rewardEarned: null,
+    },
+  ];
+
+  const createdEnrollments = await db
+    .insert(schema.accountOfferEnrollments)
+    .values(enrollmentsData)
+    .returning();
+  console.log(`✓ Created ${createdEnrollments.length} offer enrollments`);
+
+  // Create sample transactions
+  console.log("Creating account transactions...");
+
+  const transactionsData = [
+    // Victoria's Amazon transactions (enrollment 0 - completed)
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[0].id,
+      transactionDate: new Date("2025-11-05"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 15000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[0].id,
+      transactionDate: new Date("2025-11-10"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 28500,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[0].id,
+      transactionDate: new Date("2025-11-15"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 22000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[0].id,
+      transactionDate: new Date("2025-11-20"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 19500,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[0].id,
+      transactionDate: new Date("2025-11-28"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 15000,
+      qualifiesForOffer: true,
+    },
+
+    // Alexander's Amazon transactions (enrollment 1 - in progress)
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[1].id,
+      transactionDate: new Date("2025-11-08"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 32000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[1].id,
+      transactionDate: new Date("2025-11-18"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 25500,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[1].id,
+      transactionDate: new Date("2025-11-25"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 21000,
+      qualifiesForOffer: true,
+    },
+
+    // William's Amazon transactions (enrollment 2)
+    {
+      accountId: createdAccounts[3].id,
+      enrollmentId: createdEnrollments[2].id,
+      transactionDate: new Date("2025-11-12"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 18200,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[3].id,
+      enrollmentId: createdEnrollments[2].id,
+      transactionDate: new Date("2025-11-22"),
+      merchant: "Amazon",
+      category: "Online Shopping",
+      amount: 27000,
+      qualifiesForOffer: true,
+    },
+
+    // Isabella's Target transactions (enrollment 5)
+    {
+      accountId: createdAccounts[2].id,
+      enrollmentId: createdEnrollments[5].id,
+      transactionDate: new Date("2025-11-04"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 8500,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[2].id,
+      enrollmentId: createdEnrollments[5].id,
+      transactionDate: new Date("2025-11-11"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 12000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[2].id,
+      enrollmentId: createdEnrollments[5].id,
+      transactionDate: new Date("2025-11-18"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 12000,
+      qualifiesForOffer: true,
+    },
+
+    // Sophia's Target transactions (enrollment 6 - completed)
+    {
+      accountId: createdAccounts[4].id,
+      enrollmentId: createdEnrollments[6].id,
+      transactionDate: new Date("2025-11-09"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 18000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[4].id,
+      enrollmentId: createdEnrollments[6].id,
+      transactionDate: new Date("2025-11-16"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 15500,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[4].id,
+      enrollmentId: createdEnrollments[6].id,
+      transactionDate: new Date("2025-11-25"),
+      merchant: "Target",
+      category: "Retail",
+      amount: 16500,
+      qualifiesForOffer: true,
+    },
+
+    // James's Starbucks transactions (enrollment 8 - completed)
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: createdEnrollments[8].id,
+      transactionDate: new Date("2025-11-03"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 850,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: createdEnrollments[8].id,
+      transactionDate: new Date("2025-11-05"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 720,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: createdEnrollments[8].id,
+      transactionDate: new Date("2025-11-08"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 980,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: createdEnrollments[8].id,
+      transactionDate: new Date("2025-11-10"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 1250,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: createdEnrollments[8].id,
+      transactionDate: new Date("2025-11-12"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 1200,
+      qualifiesForOffer: true,
+    },
+
+    // Emma's Starbucks transactions (enrollment 9)
+    {
+      accountId: createdAccounts[6].id,
+      enrollmentId: createdEnrollments[9].id,
+      transactionDate: new Date("2025-11-07"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 650,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[6].id,
+      enrollmentId: createdEnrollments[9].id,
+      transactionDate: new Date("2025-11-14"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 1100,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[6].id,
+      enrollmentId: createdEnrollments[9].id,
+      transactionDate: new Date("2025-11-21"),
+      merchant: "Starbucks",
+      category: "Dining",
+      amount: 1450,
+      qualifiesForOffer: true,
+    },
+
+    // Victoria's Travel transactions (enrollment 14)
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[14].id,
+      transactionDate: new Date("2025-09-15"),
+      merchant: "Delta Airlines",
+      category: "Travel",
+      amount: 45000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[14].id,
+      transactionDate: new Date("2025-10-05"),
+      merchant: "Marriott Hotels",
+      category: "Travel",
+      amount: 38000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[14].id,
+      transactionDate: new Date("2025-10-20"),
+      merchant: "United Airlines",
+      category: "Travel",
+      amount: 52000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: createdEnrollments[14].id,
+      transactionDate: new Date("2025-11-10"),
+      merchant: "Hilton",
+      category: "Travel",
+      amount: 21000,
+      qualifiesForOffer: true,
+    },
+
+    // Alexander's Travel transactions (enrollment 15 - completed)
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[15].id,
+      transactionDate: new Date("2025-08-20"),
+      merchant: "American Airlines",
+      category: "Travel",
+      amount: 65000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[15].id,
+      transactionDate: new Date("2025-09-10"),
+      merchant: "Hyatt Hotels",
+      category: "Travel",
+      amount: 42000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[15].id,
+      transactionDate: new Date("2025-10-15"),
+      merchant: "Southwest Airlines",
+      category: "Travel",
+      amount: 35000,
+      qualifiesForOffer: true,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: createdEnrollments[15].id,
+      transactionDate: new Date("2025-11-05"),
+      merchant: "Four Seasons",
+      category: "Travel",
+      amount: 58000,
+      qualifiesForOffer: true,
+    },
+
+    // Non-qualifying transactions (general spending)
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-02"),
+      merchant: "Whole Foods",
+      category: "Groceries",
+      amount: 15600,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[0].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-08"),
+      merchant: "Shell Gas",
+      category: "Gas Stations",
+      amount: 6500,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[1].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-12"),
+      merchant: "Trader Joe's",
+      category: "Groceries",
+      amount: 9800,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[2].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-06"),
+      merchant: "Costco",
+      category: "Groceries",
+      amount: 28500,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[3].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-15"),
+      merchant: "Best Buy",
+      category: "Electronics",
+      amount: 125000,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[4].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-20"),
+      merchant: "Nordstrom",
+      category: "Retail",
+      amount: 34500,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[5].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-18"),
+      merchant: "Apple Store",
+      category: "Electronics",
+      amount: 129900,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[6].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-22"),
+      merchant: "Cheesecake Factory",
+      category: "Dining",
+      amount: 8500,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[9].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-10"),
+      merchant: "Safeway",
+      category: "Groceries",
+      amount: 12300,
+      qualifiesForOffer: false,
+    },
+    {
+      accountId: createdAccounts[10].id,
+      enrollmentId: null,
+      transactionDate: new Date("2025-11-14"),
+      merchant: "CVS",
+      category: "Pharmacy",
+      amount: 4500,
+      qualifiesForOffer: false,
+    },
+  ];
+
+  await db.insert(schema.accountTransactions).values(transactionsData);
+  console.log(`✓ Created ${transactionsData.length} transactions`);
+
   console.log("\n✅ Database seed completed successfully!");
   console.log("\nSummary:");
   console.log(`- ${createdOffers.length} offers`);
@@ -537,6 +1841,11 @@ async function seed() {
   console.log("- 9 approvals");
   console.log("- 4 audit log entries");
   console.log("- 1 simulation run");
+  console.log(`- ${createdAccounts.length} accounts`);
+  console.log(`- ${createdSpendingGroups.length} spending groups`);
+  console.log(`- ${spendingGroupAccountsData.length} account-group links`);
+  console.log(`- ${createdEnrollments.length} offer enrollments`);
+  console.log(`- ${transactionsData.length} transactions`);
 }
 
 seed()
@@ -547,4 +1856,3 @@ seed()
   .finally(() => {
     process.exit(0);
   });
-
