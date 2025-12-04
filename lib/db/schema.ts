@@ -229,7 +229,7 @@ export const offers = pgTable("offers", {
   hasProgressTracking: boolean("has_progress_tracking")
     .notNull()
     .default(false),
-  progressTarget: jsonb("progress_target").default(null).$type<{
+  progressTarget: jsonb("progress_target").$type<{
     targetAmount?: number; // in cents
     category?: string;
     vendor?: string;

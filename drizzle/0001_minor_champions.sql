@@ -73,7 +73,7 @@ CREATE TABLE "spending_groups" (
 );
 --> statement-breakpoint
 ALTER TABLE "offers" ADD COLUMN "has_progress_tracking" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "offers" ADD COLUMN "progress_target" jsonb DEFAULT 'null'::jsonb;--> statement-breakpoint
+ALTER TABLE "offers" ADD COLUMN "progress_target" jsonb;--> statement-breakpoint
 ALTER TABLE "account_offer_enrollments" ADD CONSTRAINT "account_offer_enrollments_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."accounts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_offer_enrollments" ADD CONSTRAINT "account_offer_enrollments_offer_id_offers_id_fk" FOREIGN KEY ("offer_id") REFERENCES "public"."offers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_offer_enrollments" ADD CONSTRAINT "account_offer_enrollments_campaign_id_campaigns_id_fk" FOREIGN KEY ("campaign_id") REFERENCES "public"."campaigns"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

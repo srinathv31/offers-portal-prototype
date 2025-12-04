@@ -15,6 +15,13 @@
       "when": 1764874612432,
       "tag": "0001_minor_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764874900231,
+      "tag": "0002_vengeful_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "offers" ALTER COLUMN "progress_target" DROP DEFAULT;
