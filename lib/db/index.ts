@@ -111,3 +111,178 @@ export async function getSimulationRun(runId: string) {
 
   return run;
 }
+
+// ==========================================
+// ACCOUNT HELPERS
+// ==========================================
+
+export interface AccountFilters {
+  tier?: schema.AccountTier;
+  status?: schema.AccountStatus;
+  search?: string;
+}
+
+export async function getAllAccounts(filters?: AccountFilters) {
+  const allAccounts = await db.query.accounts.findMany({
+    with: {
+      accountOfferEnrollments: true,
+      spendingGroupAccounts: {
+        with: {
+          spendingGroup: true,
+        },
+      },
+    },
+    orderBy: (accounts, { desc }) => [desc(accounts.updatedAt)],
+  });
+
+  // Apply filters in-memory (for simplicity in POC)
+  let filtered = allAccounts;
+
+  if (filters?.tier) {
+    filtered = filtered.filter((a) => a.tier === filters.tier);
+  }
+
+  if (filters?.status) {
+    filtered = filtered.filter((a) => a.status === filters.status);
+  }
+
+  if (filters?.search) {
+    const search = filters.search.toLowerCase();
+    filtered = filtered.filter(
+      (a) =>
+        a.firstName.toLowerCase().includes(search) ||
+        a.lastName.toLowerCase().includes(search) ||
+        a.accountNumber.toLowerCase().includes(search) ||
+        a.email.toLowerCase().includes(search)
+    );
+  }
+
+  return filtered;
+}
+
+export async function getAccountWithDetails(accountId: string) {
+  const account = await db.query.accounts.findFirst({
+    where: (accounts, { eq }) => eq(accounts.id, accountId),
+    with: {
+      accountOfferEnrollments: {
+        with: {
+          offer: true,
+          campaign: true,
+          transactions: {
+            orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+          },
+        },
+        orderBy: (enrollments, { desc }) => [desc(enrollments.enrolledAt)],
+      },
+      accountTransactions: {
+        orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+        limit: 100,
+      },
+      spendingGroupAccounts: {
+        with: {
+          spendingGroup: true,
+        },
+      },
+    },
+  });
+
+  return account;
+}
+
+// ==========================================
+// SPENDING GROUP HELPERS
+// ==========================================
+
+export async function getAllSpendingGroups() {
+  const groups = await db.query.spendingGroups.findMany({
+    with: {
+      spendingGroupAccounts: {
+        with: {
+          account: true,
+        },
+      },
+      segmentSpendingGroups: {
+        with: {
+          segment: true,
+        },
+      },
+    },
+    orderBy: (groups, { desc }) => [desc(groups.accountCount)],
+  });
+
+  return groups;
+}
+
+export async function getSpendingGroupWithAccounts(groupId: string) {
+  const group = await db.query.spendingGroups.findFirst({
+    where: (groups, { eq }) => eq(groups.id, groupId),
+    with: {
+      spendingGroupAccounts: {
+        with: {
+          account: {
+            with: {
+              accountOfferEnrollments: true,
+            },
+          },
+        },
+      },
+      segmentSpendingGroups: {
+        with: {
+          segment: true,
+        },
+      },
+    },
+  });
+
+  return group;
+}
+
+// ==========================================
+// ENROLLMENT HELPERS
+// ==========================================
+
+export async function getEnrollmentsByCampaign(campaignId: string) {
+  const enrollments = await db.query.accountOfferEnrollments.findMany({
+    where: (enrollments, { eq }) => eq(enrollments.campaignId, campaignId),
+    with: {
+      account: true,
+      offer: true,
+      transactions: {
+        orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+        limit: 10,
+      },
+    },
+    orderBy: (enrollments, { desc }) => [desc(enrollments.enrolledAt)],
+  });
+
+  return enrollments;
+}
+
+export async function getEnrollmentsByOffer(offerId: string) {
+  const enrollments = await db.query.accountOfferEnrollments.findMany({
+    where: (enrollments, { eq }) => eq(enrollments.offerId, offerId),
+    with: {
+      account: true,
+      campaign: true,
+    },
+    orderBy: (enrollments, { desc }) => [desc(enrollments.enrolledAt)],
+  });
+
+  return enrollments;
+}
+
+export async function getEnrollmentWithTransactions(enrollmentId: string) {
+  const enrollment = await db.query.accountOfferEnrollments.findFirst({
+    where: (enrollments, { eq }) => eq(enrollments.id, enrollmentId),
+    with: {
+      account: true,
+      offer: true,
+      campaign: true,
+      transactions: {
+        orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+      },
+    },
+  });
+
+  return enrollment;
+}
