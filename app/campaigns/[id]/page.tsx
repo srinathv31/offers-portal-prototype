@@ -1,20 +1,25 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCampaignWithRelations } from "@/lib/db";
+import { getCampaignWithRelations, getEnrollmentsByCampaign } from "@/lib/db";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricKPI } from "@/components/metric-kpi";
 import { OfferListItem } from "@/components/offer-list-item";
 import { ControlChecklistView } from "@/components/control-checklist-view";
 import { ApprovalList } from "@/components/approval-list";
+import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
+import { EnrollmentStatusBadge } from "@/components/enrollment-status-badge";
+import { AccountTierBadge } from "@/components/account-tier-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, PlayCircle, Rocket, Calendar, User } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, PlayCircle, Rocket, Calendar, User, Users, Target } from "lucide-react";
 import { format } from "date-fns";
+import type { EnrollmentStatus } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +28,10 @@ interface PageProps {
 }
 
 async function CampaignDetailContent({ id }: { id: string }) {
-  const campaign = await getCampaignWithRelations(id);
+  const [campaign, enrollments] = await Promise.all([
+    getCampaignWithRelations(id),
+    getEnrollmentsByCampaign(id),
+  ]);
 
   if (!campaign) {
     notFound();
@@ -33,6 +41,16 @@ async function CampaignDetailContent({ id }: { id: string }) {
   const segments = campaign.campaignSegments.map((cs) => cs.segment);
   const rules = campaign.campaignEligibilityRules.map((cr) => cr.eligibilityRule);
   const metrics = campaign.metrics as any;
+
+  // Group enrollments by status
+  const enrollmentStats = {
+    total: enrollments.length,
+    enrolled: enrollments.filter((e) => e.status === "ENROLLED").length,
+    inProgress: enrollments.filter((e) => e.status === "IN_PROGRESS").length,
+    completed: enrollments.filter((e) => e.status === "COMPLETED").length,
+    expired: enrollments.filter((e) => e.status === "EXPIRED").length,
+    optedOut: enrollments.filter((e) => e.status === "OPTED_OUT").length,
+  };
 
   return (
     <div className="min-h-screen">
@@ -125,9 +143,17 @@ async function CampaignDetailContent({ id }: { id: string }) {
       {/* Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="offers">Offers</TabsTrigger>
+            <TabsTrigger value="enrollments">
+              Enrollments
+              {enrollmentStats.total > 0 && (
+                <Badge variant="secondary" className="ml-1.5 text-xs">
+                  {enrollmentStats.total}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="targeting">Targeting</TabsTrigger>
             <TabsTrigger value="controls">Controls</TabsTrigger>
           </TabsList>
@@ -216,6 +242,123 @@ async function CampaignDetailContent({ id }: { id: string }) {
                   ))
                 ) : (
                   <p className="text-muted-foreground text-center py-8">No offers added yet</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Enrollments Tab */}
+          <TabsContent value="enrollments" className="space-y-6">
+            {/* Enrollment Stats */}
+            {enrollmentStats.total > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Enrollment Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-5">
+                    <div className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-2xl font-bold">{enrollmentStats.total}</p>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {enrollmentStats.enrolled}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Enrolled</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20">
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {enrollmentStats.inProgress}
+                      </p>
+                      <p className="text-xs text-muted-foreground">In Progress</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {enrollmentStats.completed}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Completed</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/20">
+                      <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">
+                        {enrollmentStats.expired + enrollmentStats.optedOut}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Expired/Opted Out</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Enrollment List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Enrolled Accounts ({enrollments.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {enrollments.length > 0 ? (
+                  <div className="space-y-3">
+                    {enrollments.map((enrollment) => (
+                      <Link
+                        key={enrollment.id}
+                        href={`/accounts/${enrollment.account.id}`}
+                        className="block p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+                              {enrollment.account.firstName[0]}
+                              {enrollment.account.lastName[0]}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">
+                                  {enrollment.account.firstName} {enrollment.account.lastName}
+                                </span>
+                                <AccountTierBadge tier={enrollment.account.tier} showIcon={false} />
+                                <EnrollmentStatusBadge status={enrollment.status} showIcon={false} />
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {enrollment.offer.name}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            {enrollment.targetAmount != null && enrollment.targetAmount > 0 && (
+                              <div className="w-32">
+                                <div className="flex items-center justify-between text-xs mb-1">
+                                  <span className="text-muted-foreground">Progress</span>
+                                  <span className="font-medium">
+                                    {parseFloat(String(enrollment.progressPct)).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <Progress 
+                                  value={Math.min(parseFloat(String(enrollment.progressPct)), 100)} 
+                                  className="h-1.5" 
+                                />
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Enrolled {format(new Date(enrollment.enrolledAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center">
+                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      No accounts enrolled in this campaign yet
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
