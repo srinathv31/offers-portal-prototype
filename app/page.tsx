@@ -5,7 +5,13 @@ import { getAllCampaignsGrouped } from "@/lib/db";
 import { CampaignCard } from "@/components/campaign-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Rocket, ClipboardCheck, Archive } from "lucide-react";
+import {
+  Rocket,
+  ClipboardCheck,
+  Archive,
+  FlaskConical,
+  FileText,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +53,31 @@ async function DashboardContent() {
         </section>
       )}
 
+      {/* Testing Campaigns */}
+      {grouped.TESTING.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <FlaskConical className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <h2 className="text-2xl font-bold">Testing Campaigns</h2>
+            <span className="text-sm text-muted-foreground">
+              ({grouped.TESTING.length})
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.TESTING.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                id={campaign.id}
+                name={campaign.name}
+                purpose={campaign.purpose}
+                status={campaign.status}
+                metrics={campaign.metrics as any}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* In Review Campaigns */}
       {grouped.IN_REVIEW.length > 0 && (
         <section>
@@ -59,6 +90,31 @@ async function DashboardContent() {
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {grouped.IN_REVIEW.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                id={campaign.id}
+                name={campaign.name}
+                purpose={campaign.purpose}
+                status={campaign.status}
+                metrics={campaign.metrics as any}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Draft Campaigns */}
+      {grouped.DRAFT.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-2xl font-bold">Draft Campaigns</h2>
+            <span className="text-sm text-muted-foreground">
+              ({grouped.DRAFT.length})
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.DRAFT.map((campaign) => (
               <CampaignCard
                 key={campaign.id}
                 id={campaign.id}
@@ -99,7 +155,9 @@ async function DashboardContent() {
 
       {/* Empty State */}
       {grouped.LIVE.length === 0 &&
+        grouped.TESTING.length === 0 &&
         grouped.IN_REVIEW.length === 0 &&
+        grouped.DRAFT.length === 0 &&
         grouped.ENDED.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Rocket className="h-16 w-16 text-muted-foreground mb-4" />
