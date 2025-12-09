@@ -612,6 +612,7 @@ async function FastPage() {
 
 ### 5. Type Safety
 
+**Avoid using "any"**
 **Always use schema-derived types:**
 
 ```typescript

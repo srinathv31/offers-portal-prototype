@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +29,20 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { StrategySuggestion } from "@/lib/ai/types";
+import type { OfferType } from "@/lib/db/schema";
 import { getCurrentSeason } from "@/lib/ai/strategy";
+import { OfferCard } from "@/components/offer-card";
 
 type Step = "choice" | "input" | "suggestion" | "manual";
 type WorkflowMode = "ai-assisted" | "manual" | null;
+
+interface Offer {
+  id: string;
+  name: string;
+  type: OfferType;
+  vendor: string | null;
+  parameters: Record<string, any>;
+}
 
 export default function CreateCampaignPage() {
   const router = useRouter();
@@ -48,6 +58,39 @@ export default function CreateCampaignPage() {
   const [endDate, setEndDate] = useState("");
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState<StrategySuggestion | null>(null);
+
+  // Offer selection state
+  const [availableOffers, setAvailableOffers] = useState<Offer[]>([]);
+  const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+
+  // Fetch available offers
+  useEffect(() => {
+    const fetchOffers = async () => {
+      setLoadingOffers(true);
+      try {
+        const res = await fetch("/api/offers");
+        const data = await res.json();
+        setAvailableOffers(data);
+      } catch (error) {
+        console.error("Failed to fetch offers:", error);
+      } finally {
+        setLoadingOffers(false);
+      }
+    };
+
+    if (step === "manual" || step === "suggestion") {
+      fetchOffers();
+    }
+  }, [step]);
+
+  const toggleOfferSelection = (offerId: string) => {
+    setSelectedOfferIds((prev) =>
+      prev.includes(offerId)
+        ? prev.filter((id) => id !== offerId)
+        : [...prev, offerId]
+    );
+  };
 
   const handleAIAssistedChoice = async () => {
     setWorkflowMode("ai-assisted");
@@ -143,6 +186,7 @@ export default function CreateCampaignPage() {
           startDate: startDate || undefined,
           endDate: endDate || undefined,
           channels: selectedChannels.length > 0 ? selectedChannels : undefined,
+          offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
         }),
       });
 
@@ -180,6 +224,7 @@ export default function CreateCampaignPage() {
           name: campaignName,
           purpose: campaignPurpose,
           suggestion,
+          offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
         }),
       });
 
@@ -463,14 +508,53 @@ export default function CreateCampaignPage() {
                 </p>
               </div>
 
-              <Alert>
-                <Sparkles className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Note:</strong> You can add offers, segments, and
-                  additional details from the campaign detail page after
-                  creation.
-                </AlertDescription>
-              </Alert>
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Select Offers (Optional)</Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Choose existing offers to include in this campaign
+                </p>
+                {loadingOffers ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-32" />
+                    ))}
+                  </div>
+                ) : availableOffers.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 max-h-[400px] overflow-y-auto pr-2">
+                    {availableOffers.map((offer) => (
+                      <OfferCard
+                        key={offer.id}
+                        id={offer.id}
+                        name={offer.name}
+                        type={offer.type}
+                        vendor={offer.vendor}
+                        parameters={offer.parameters}
+                        selectable
+                        selected={selectedOfferIds.includes(offer.id)}
+                        onSelect={toggleOfferSelection}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Alert>
+                    <AlertDescription>
+                      No offers available.{" "}
+                      <Link href="/create-offer" className="underline">
+                        Create an offer
+                      </Link>{" "}
+                      first.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {selectedOfferIds.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {selectedOfferIds.length} offer
+                    {selectedOfferIds.length !== 1 ? "s" : ""} selected
+                  </p>
+                )}
+              </div>
 
               <div className="flex gap-3">
                 <Button
@@ -775,6 +859,59 @@ export default function CreateCampaignPage() {
                     </div>
                   </>
                 )}
+
+                <Separator />
+
+                {/* Select Existing Offers */}
+                <div>
+                  <Label className="text-lg font-semibold">
+                    Select Existing Offers (Optional)
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    Choose from your existing offers to include in this campaign
+                  </p>
+                  {loadingOffers ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[1, 2, 3, 4].map((i) => (
+                        <Skeleton key={i} className="h-32" />
+                      ))}
+                    </div>
+                  ) : availableOffers.length > 0 ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2 max-h-[400px] overflow-y-auto pr-2">
+                        {availableOffers.map((offer) => (
+                          <OfferCard
+                            key={offer.id}
+                            id={offer.id}
+                            name={offer.name}
+                            type={offer.type}
+                            vendor={offer.vendor}
+                            parameters={offer.parameters}
+                            selectable
+                            selected={selectedOfferIds.includes(offer.id)}
+                            onSelect={toggleOfferSelection}
+                          />
+                        ))}
+                      </div>
+                      {selectedOfferIds.length > 0 && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {selectedOfferIds.length} offer
+                          {selectedOfferIds.length !== 1 ? "s" : ""} selected
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <Alert>
+                      <AlertDescription>
+                        No offers available.{" "}
+                        <Link href="/create-offer" className="underline">
+                          Create an offer
+                        </Link>{" "}
+                        first, or the AI will create offers for you.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
