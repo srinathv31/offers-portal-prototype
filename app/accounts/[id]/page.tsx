@@ -7,7 +7,7 @@ import { AccountStatusBadge } from "@/components/account-status-badge";
 import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
 import { AccountTransactionsTab } from "@/components/account-transactions-tab";
 import { CreditCardProductBadge } from "@/components/credit-card-product-badge";
-import { getCreditCardProductDescription } from "@/lib/credit-card-utils";
+import { creditCardProductDescriptions } from "@/lib/credit-card-utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -342,9 +342,9 @@ async function AccountDetailContent({ id }: { id: string }) {
                               product={card.creditCardProduct}
                             />
                             <p className="text-xs text-muted-foreground">
-                              {getCreditCardProductDescription(
+                              {creditCardProductDescriptions[
                                 card.creditCardProduct
-                              )}
+                              ]}
                             </p>
                           </div>
 

@@ -898,6 +898,100 @@ async function seed() {
     .returning();
   console.log(`✓ Created ${createdAccounts.length} accounts`);
 
+  // Create credit cards
+  console.log("Creating credit cards...");
+  
+  // Helper function to generate realistic card numbers
+  const generateCardNumber = (lastFour: string) => `**** **** **** ${lastFour}`;
+  
+  // Credit card products for each tier
+  const tierProducts = {
+    DIAMOND: ["FIRST_CLASS", "DOUBLE_UP", "CASH_CREDIT"],
+    PLATINUM: ["DOUBLE_UP", "CASH_CREDIT", "FLEXPAY"],
+    GOLD: ["CASH_CREDIT", "FLEXPAY", "CLEAR"],
+    STANDARD: ["FLEXPAY", "CLEAR"],
+  };
+
+  const creditCardsData = [];
+  const accountCreditCardsData = [];
+
+  // Create 1-3 credit cards per account
+  for (let i = 0; i < createdAccounts.length; i++) {
+    const account = createdAccounts[i];
+    const products = tierProducts[account.tier as keyof typeof tierProducts];
+    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
+    
+    for (let cardIndex = 0; cardIndex < numCards; cardIndex++) {
+      const product = products[cardIndex % products.length];
+      const lastFour = String(1000 + (i * 10) + cardIndex).padStart(4, "0");
+      const openedYears = Math.floor(Math.random() * 3) + 1; // 1-3 years ago
+      const openedAt = new Date();
+      openedAt.setFullYear(openedAt.getFullYear() - openedYears);
+      
+      const expirationDate = new Date();
+      expirationDate.setFullYear(expirationDate.getFullYear() + 3);
+      
+      // Credit limit based on tier and account limit
+      const cardCreditLimit = Math.floor(account.creditLimit * (cardIndex === 0 ? 0.6 : 0.4));
+      const currentBalance = Math.floor(cardCreditLimit * (Math.random() * 0.3)); // 0-30% utilization
+      
+      creditCardsData.push({
+        creditCardProduct: product as "FLEXPAY" | "DOUBLE_UP" | "CASH_CREDIT" | "FIRST_CLASS" | "CLEAR",
+        cardNumber: generateCardNumber(lastFour),
+        lastFourDigits: lastFour,
+        creditLimit: cardCreditLimit,
+        currentBalance: currentBalance,
+        openedAt: openedAt,
+        expirationDate: expirationDate,
+        isActive: account.status === "ACTIVE",
+      });
+    }
+  }
+
+  const createdCreditCards = await db
+    .insert(schema.creditCards)
+    .values(creditCardsData)
+    .returning();
+  console.log(`✓ Created ${createdCreditCards.length} credit cards`);
+
+  // Link credit cards to accounts
+  console.log("Linking credit cards to accounts...");
+  
+  let cardIndex = 0;
+  for (let i = 0; i < createdAccounts.length; i++) {
+    const account = createdAccounts[i];
+    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
+    
+    for (let j = 0; j < numCards; j++) {
+      const creditCard = createdCreditCards[cardIndex];
+      const isPrimary = j === 0; // First card is primary
+      
+      // Simulate usage
+      const usageCount = Math.floor(Math.random() * 50) + 10; // 10-60 transactions
+      const lastUsed = new Date();
+      lastUsed.setDate(lastUsed.getDate() - Math.floor(Math.random() * 30)); // Last 30 days
+      
+      // Assign preferred categories
+      const categories = ["Dining", "Travel", "Groceries", "Gas", "Shopping", null];
+      const preferredCategory = j === 1 ? categories[Math.floor(Math.random() * categories.length)] : null;
+      
+      accountCreditCardsData.push({
+        accountId: account.id,
+        creditCardId: creditCard.id,
+        isPrimary: isPrimary,
+        addedAt: creditCard.openedAt,
+        usageCount: usageCount,
+        lastUsedAt: account.status === "ACTIVE" ? lastUsed : null,
+        preferredForCategory: preferredCategory,
+      });
+      
+      cardIndex++;
+    }
+  }
+
+  await db.insert(schema.accountCreditCards).values(accountCreditCardsData);
+  console.log(`✓ Linked ${accountCreditCardsData.length} credit cards to accounts`);
+
   // Create spending groups (5 groups)
   console.log("Creating spending groups...");
   const spendingGroupsData = [
@@ -1593,6 +1687,17 @@ async function seed() {
   // Create sample transactions
   console.log("Creating account transactions...");
 
+  // Create mapping of account ID to primary credit card ID for transactions
+  const accountToPrimaryCreditCard = new Map<string, string>();
+  let creditCardIndex = 0;
+  for (let i = 0; i < createdAccounts.length; i++) {
+    const account = createdAccounts[i];
+    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
+    // First card is always primary
+    accountToPrimaryCreditCard.set(account.id, createdCreditCards[creditCardIndex].id);
+    creditCardIndex += numCards;
+  }
+
   const transactionsData = [
     // Victoria's Amazon transactions (enrollment 0 - completed)
     {
@@ -1993,8 +2098,14 @@ async function seed() {
     },
   ];
 
-  await db.insert(schema.accountTransactions).values(transactionsData);
-  console.log(`✓ Created ${transactionsData.length} transactions`);
+  // Add credit card IDs to transactions
+  const transactionsWithCards = transactionsData.map((tx) => ({
+    ...tx,
+    creditCardId: accountToPrimaryCreditCard.get(tx.accountId),
+  }));
+
+  await db.insert(schema.accountTransactions).values(transactionsWithCards);
+  console.log(`✓ Created ${transactionsWithCards.length} transactions`);
 
   console.log("\n✅ Database seed completed successfully!");
   console.log("\nSummary:");
@@ -2009,10 +2120,12 @@ async function seed() {
   console.log("- 4 audit log entries");
   console.log("- 1 simulation run");
   console.log(`- ${createdAccounts.length} accounts`);
+  console.log(`- ${createdCreditCards.length} credit cards`);
+  console.log(`- ${accountCreditCardsData.length} account-credit card links`);
   console.log(`- ${createdSpendingGroups.length} spending groups`);
   console.log(`- ${spendingGroupAccountsData.length} account-group links`);
   console.log(`- ${createdEnrollments.length} offer enrollments`);
-  console.log(`- ${transactionsData.length} transactions`);
+  console.log(`- ${transactionsWithCards.length} transactions`);
 }
 
 seed()
