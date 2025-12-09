@@ -7,7 +7,6 @@ import { MetricKPI } from "@/components/metric-kpi";
 import { OfferListItem } from "@/components/offer-list-item";
 import { ControlChecklistView } from "@/components/control-checklist-view";
 import { ApprovalList } from "@/components/approval-list";
-import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
 import { EnrollmentStatusBadge } from "@/components/enrollment-status-badge";
 import { AccountTierBadge } from "@/components/account-tier-badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, PlayCircle, Rocket, Calendar, User, Users, Target } from "lucide-react";
 import { format } from "date-fns";
-import type { EnrollmentStatus } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +38,12 @@ async function CampaignDetailContent({ id }: { id: string }) {
   const offers = campaign.campaignOffers.map((co) => co.offer);
   const segments = campaign.campaignSegments.map((cs) => cs.segment);
   const rules = campaign.campaignEligibilityRules.map((cr) => cr.eligibilityRule);
-  const metrics = campaign.metrics as any;
+  const metrics = campaign.metrics as {
+    activations?: number;
+    revenue?: number;
+    projected_lift_pct?: number;
+    error_rate_pct?: number;
+  };
 
   // Group enrollments by status
   const enrollmentStats = {
@@ -384,7 +387,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
                       {segment.definitionJson && (
                         <p className="text-sm text-muted-foreground mt-2">
                           Est. Size:{" "}
-                          {((segment.definitionJson as any)?.estimatedSize || 0).toLocaleString()}
+                          {((segment.definitionJson as { estimatedSize?: number })?.estimatedSize || 0).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -429,7 +432,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent>
                   <ControlChecklistView
-                    items={(campaign.controlChecklist.items as any) || []}
+                    items={(campaign.controlChecklist.items as Array<{ id: string; label: string; checked: boolean }>) || []}
                   />
                 </CardContent>
               </Card>

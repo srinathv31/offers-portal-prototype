@@ -41,7 +41,7 @@ interface Offer {
   name: string;
   type: OfferType;
   vendor: string | null;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
 }
 
 export default function CreateCampaignPage() {

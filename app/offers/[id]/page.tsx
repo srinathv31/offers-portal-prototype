@@ -39,7 +39,7 @@ async function OfferDetailContent({ id }: { id: string }) {
   }
 
   const campaigns = offer.campaignOffers.map((co) => co.campaign);
-  const parameters = (offer.parameters || {}) as Record<string, any>;
+  const parameters = (offer.parameters || {}) as Record<string, unknown>;
 
   // Find most recent completed campaign for performance data
   const liveCampaigns = campaigns.filter((c) => c.status === "LIVE");
@@ -194,19 +194,19 @@ async function OfferDetailContent({ id }: { id: string }) {
                 <div>
                   <p className="text-sm text-muted-foreground">Revenue</p>
                   <p className="text-2xl font-bold">
-                    ${((lastCampaign.metrics as any)?.revenue || 0).toLocaleString()}
+                    ${((lastCampaign.metrics as { revenue?: number })?.revenue || 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Activations</p>
                   <p className="text-2xl font-bold">
-                    {((lastCampaign.metrics as any)?.activations || 0).toLocaleString()}
+                    {((lastCampaign.metrics as { activations?: number })?.activations || 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Error Rate</p>
                   <p className="text-2xl font-bold">
-                    {((lastCampaign.metrics as any)?.error_rate_pct || 0).toFixed(2)}%
+                    {((lastCampaign.metrics as { error_rate_pct?: number })?.error_rate_pct || 0).toFixed(2)}%
                   </p>
                 </div>
               </div>

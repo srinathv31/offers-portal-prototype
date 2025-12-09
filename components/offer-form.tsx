@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import type { OfferType } from "@/lib/db/schema";
 
@@ -16,7 +14,7 @@ interface OfferFormProps {
     name: string;
     type: OfferType;
     vendor: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
     hasProgressTracking: boolean;
     progressTarget: {
       targetAmount?: number;
@@ -27,7 +25,21 @@ interface OfferFormProps {
     effectiveFrom?: string;
     effectiveTo?: string;
   };
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: {
+    name: string;
+    type: OfferType;
+    vendor?: string | null;
+    parameters: Record<string, unknown>;
+    hasProgressTracking: boolean;
+    progressTarget?: {
+      targetAmount?: number;
+      category?: string;
+      vendor?: string;
+      timeframeDays?: number;
+    } | null;
+    effectiveFrom?: string;
+    effectiveTo?: string;
+  }) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
 }
@@ -120,7 +132,7 @@ export function OfferForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const parameters: Record<string, any> = {};
+    const parameters: Record<string, unknown> = {};
 
     // Build parameters based on offer type
     if (type === "POINTS_MULTIPLIER") {

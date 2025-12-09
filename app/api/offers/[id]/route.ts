@@ -68,14 +68,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      type?: string;
+      vendor?: string | null;
+      parameters?: Record<string, unknown>;
+      hasProgressTracking?: boolean;
+      progressTarget?: {
+        targetAmount?: number;
+        category?: string;
+        vendor?: string;
+        timeframeDays?: number;
+      } | null;
+      effectiveFrom?: Date | null;
+      effectiveTo?: Date | null;
+    } = {};
     if (name !== undefined) updateData.name = name;
     if (type !== undefined) updateData.type = type;
     if (vendor !== undefined) updateData.vendor = vendor || null;
     if (parameters !== undefined) updateData.parameters = parameters;
     if (hasProgressTracking !== undefined)
       updateData.hasProgressTracking = hasProgressTracking;
-    if (progressTarget !== undefined) updateData.progressTarget = progressTarget;
+    if (progressTarget !== undefined)
+      updateData.progressTarget = progressTarget;
     if (effectiveFrom !== undefined)
       updateData.effectiveFrom = effectiveFrom ? new Date(effectiveFrom) : null;
     if (effectiveTo !== undefined)
@@ -99,4 +114,3 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 }
-

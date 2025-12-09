@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { EnrollmentStatusBadge } from "@/components/enrollment-status-badge";
 import type { EnrollmentStatus, OfferType } from "@/lib/db/schema";
-import { Calendar, Target, Gift, ChevronRight } from "lucide-react";
+import { Calendar, Target, Gift } from "lucide-react";
 import { format } from "date-fns";
 
 interface EnrollmentProgressCardProps {
@@ -62,7 +62,6 @@ export function EnrollmentProgressCard({
   currentProgress,
   progressPct,
   rewardEarned,
-  completedAt,
   accountId,
   showAccountLink,
   accountName,

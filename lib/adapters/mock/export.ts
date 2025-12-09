@@ -12,7 +12,7 @@ interface ReportData {
     duration: string;
     success: boolean;
   };
-  inputs: Record<string, any>;
+  inputs: Record<string, unknown>;
   projections: {
     revenue: number;
     activations: number;
@@ -41,6 +41,26 @@ interface ReportData {
     creatives: Array<{ channel: string; preview: string }>;
   };
   recommendations: string[];
+}
+
+interface SimulationRun {
+  id: string;
+  campaignId: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  success: boolean | null;
+  inputs: Record<string, unknown> | null;
+  projections: {
+    revenue?: number;
+    activations?: number;
+    error_rate_pct?: number;
+  } | null;
+  steps: Array<{
+    key: string;
+    label: string;
+    status: string;
+  }> | null;
+  errors: Array<{ message: string; step?: string }> | null;
 }
 
 /**
@@ -87,14 +107,26 @@ export async function buildReport(runId: string): Promise<ReportData> {
     generatedAt: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
     executionSummary: {
       startedAt: format(run.startedAt, "yyyy-MM-dd HH:mm:ss"),
-      finishedAt: run.finishedAt ? format(run.finishedAt, "yyyy-MM-dd HH:mm:ss") : "In Progress",
+      finishedAt: run.finishedAt
+        ? format(run.finishedAt, "yyyy-MM-dd HH:mm:ss")
+        : "In Progress",
       duration: `${durationSeconds}s`,
       success: run.success || false,
     },
-    inputs: run.inputs as Record<string, any>,
-    projections: run.projections as any,
-    steps: run.steps as any,
-    errors: run.errors as any,
+    inputs: (run.inputs ?? {}) as Record<string, unknown>,
+    projections: {
+      revenue: (run.projections as { revenue?: number })?.revenue ?? 0,
+      activations:
+        (run.projections as { activations?: number })?.activations ?? 0,
+      error_rate_pct:
+        (run.projections as { error_rate_pct?: number })?.error_rate_pct ?? 0,
+    },
+    steps: run.steps as Array<{
+      key: string;
+      label: string;
+      status: string;
+    }>,
+    errors: run.errors as Array<{ message: string; step?: string }>,
     offers: campaign.campaignOffers.map((co) => ({
       id: co.offer.id,
       name: co.offer.name,
@@ -102,7 +134,9 @@ export async function buildReport(runId: string): Promise<ReportData> {
       vendor: co.offer.vendor || undefined,
     })),
     segments: campaign.campaignSegments.map((cs) => {
-      const definitionJson = cs.segment.definitionJson as any;
+      const definitionJson = cs.segment.definitionJson as {
+        estimatedSize?: number;
+      } | null;
       return {
         id: cs.segment.id,
         name: cs.segment.name,
@@ -113,7 +147,11 @@ export async function buildReport(runId: string): Promise<ReportData> {
     channelPlan: campaign.channelPlan
       ? {
           channels: (campaign.channelPlan.channels as string[]) || [],
-          creatives: (campaign.channelPlan.creatives as any[]) || [],
+          creatives:
+            (campaign.channelPlan.creatives as Array<{
+              channel: string;
+              preview: string;
+            }>) || [],
         }
       : undefined,
     recommendations: generateRecommendations(run),
@@ -139,7 +177,9 @@ export async function emailReport(
 
   await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate network delay
 
-  const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const messageId = `msg-${Date.now()}-${Math.random()
+    .toString(36)
+    .substring(7)}`;
 
   console.log(`[Export] Email delivered with message ID: ${messageId}`);
 
@@ -152,24 +192,33 @@ export async function emailReport(
 /**
  * Generate recommendations based on simulation results
  */
-function generateRecommendations(run: any): string[] {
+function generateRecommendations(run: SimulationRun): string[] {
   const recommendations: string[] = [];
 
-  const projections = run.projections as any;
-  const errors = run.errors as any[];
+  const projections = (run.projections ?? {}) as {
+    revenue?: number;
+    activations?: number;
+    error_rate_pct?: number;
+  };
+  const errors = (run.errors ?? []) as Array<{
+    message: string;
+    step?: string;
+  }>;
 
   // Check error rate
-  if (projections.error_rate_pct > 2) {
+  if ((projections.error_rate_pct ?? 0) > 2) {
     recommendations.push(
       "⚠️ Error rate is above 2%. Review eligibility rules and data dependencies."
     );
-  } else if (projections.error_rate_pct < 1) {
-    recommendations.push("✓ Error rate is low. Campaign is ready for production.");
+  } else if ((projections.error_rate_pct ?? 0) < 1) {
+    recommendations.push(
+      "✓ Error rate is low. Campaign is ready for production."
+    );
   }
 
   // Check activation rate
-  const activationRate =
-    projections.activations / ((run.inputs as any)?.cohortSize || 1);
+  const cohortSize = (run.inputs as { cohortSize?: number })?.cohortSize ?? 1;
+  const activationRate = (projections.activations ?? 0) / cohortSize;
   if (activationRate < 0.2) {
     recommendations.push(
       "⚠️ Activation rate is below 20%. Consider expanding segment criteria or improving offer attractiveness."
@@ -181,7 +230,7 @@ function generateRecommendations(run: any): string[] {
   }
 
   // Check revenue projections
-  if (projections.revenue > 2000000) {
+  if ((projections.revenue ?? 0) > 2000000) {
     recommendations.push(
       "✓ Strong revenue projections. Campaign has high business impact potential."
     );
@@ -212,4 +261,3 @@ function generateRecommendations(run: any): string[] {
 export function serializeReport(reportData: ReportData): string {
   return JSON.stringify(reportData, null, 2);
 }
-

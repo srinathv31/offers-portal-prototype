@@ -18,7 +18,21 @@ interface Campaign {
 
 interface EditOfferClientProps {
   offerId: string;
-  initialValues: any;
+  initialValues: {
+    name: string;
+    type: string;
+    vendor: string;
+    parameters: Record<string, unknown>;
+    hasProgressTracking: boolean;
+    progressTarget: {
+      targetAmount?: number;
+      category?: string;
+      vendor?: string;
+      timeframeDays?: number;
+    } | null;
+    effectiveFrom: string;
+    effectiveTo: string;
+  };
   liveCampaigns: Campaign[];
   allCampaigns: Campaign[];
 }
@@ -33,7 +47,21 @@ export function EditOfferClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: {
+    name: string;
+    type: string;
+    vendor?: string | null;
+    parameters: Record<string, unknown>;
+    hasProgressTracking: boolean;
+    progressTarget?: {
+      targetAmount?: number;
+      category?: string;
+      vendor?: string;
+      timeframeDays?: number;
+    } | null;
+    effectiveFrom?: string;
+    effectiveTo?: string;
+  }) => {
     setLoading(true);
     setError(null);
 

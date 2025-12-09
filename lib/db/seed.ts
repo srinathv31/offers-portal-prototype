@@ -1153,8 +1153,8 @@ async function seed() {
   console.log("Creating account offer enrollments...");
 
   // Helper to calculate progress percentage
-  const calcProgressPct = (current: number, target: number) =>
-    Math.min(100, Math.round((current / target) * 10000) / 100).toString();
+  // const calcProgressPct = (current: number, target: number) =>
+  //   Math.min(100, Math.round((current / target) * 10000) / 100).toString();
 
   const enrollmentsData = [
     // Amazon 3× Points enrollments (offer 0) - target $1000

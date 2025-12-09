@@ -25,9 +25,14 @@ async function EditOfferContent({ id }: { id: string }) {
     name: offer.name,
     type: offer.type,
     vendor: offer.vendor || "",
-    parameters: (offer.parameters || {}) as Record<string, any>,
+    parameters: (offer.parameters || {}) as Record<string, unknown>,
     hasProgressTracking: offer.hasProgressTracking,
-    progressTarget: offer.progressTarget as any,
+    progressTarget: offer.progressTarget as {
+      targetAmount?: number;
+      category?: string;
+      vendor?: string;
+      timeframeDays?: number;
+    } | null,
     effectiveFrom: offer.effectiveFrom
       ? new Date(offer.effectiveFrom).toISOString().split("T")[0]
       : "",

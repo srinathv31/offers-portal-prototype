@@ -12,7 +12,7 @@ interface OfferCardProps {
   name: string;
   type: OfferType;
   vendor: string | null;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   campaignCount?: number;
   selectable?: boolean;
   selected?: boolean;

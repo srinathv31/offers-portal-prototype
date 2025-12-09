@@ -46,7 +46,6 @@ function formatCurrency(cents: number): string {
 }
 
 export function SpendingGroupCard({
-  id,
   name,
   description,
   accountCount,

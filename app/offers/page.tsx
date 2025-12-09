@@ -17,8 +17,8 @@ interface Offer {
   name: string;
   type: OfferType;
   vendor: string | null;
-  parameters: Record<string, any>;
-  campaignOffers: Array<{ campaign: any }>;
+  parameters: Record<string, unknown>;
+  campaignOffers: Array<{ campaign: { id: string; name: string; status: string } }>;
 }
 
 export default function OffersPage() {

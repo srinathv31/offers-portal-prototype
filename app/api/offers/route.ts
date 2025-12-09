@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const vendor = searchParams.get("vendor");
     const search = searchParams.get("search");
 
-    const filters: any = {};
+    const filters: { type?: OfferType; vendor?: string; search?: string } = {};
     if (type) filters.type = type;
     if (vendor) filters.vendor = vendor;
     if (search) filters.search = search;
