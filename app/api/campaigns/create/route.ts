@@ -13,7 +13,7 @@ import type { StrategySuggestion } from "@/lib/ai/types";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, purpose, suggestion, startDate, endDate, channels, offerIds } = body;
+    const { name, purpose, suggestion, startDate, endDate, channels, offerIds, segmentIds } = body;
 
     if (!name || !purpose) {
       return NextResponse.json(
@@ -86,6 +86,19 @@ export async function POST(request: NextRequest) {
       );
       console.log(
         `[Create Campaign] Linked ${offerIds.length} existing offers to campaign ${campaign.id}`
+      );
+    }
+
+    // If segmentIds provided (e.g., from spending group), link them to the campaign
+    if (segmentIds && Array.isArray(segmentIds) && segmentIds.length > 0) {
+      await db.insert(campaignSegments).values(
+        segmentIds.map((segmentId: string) => ({
+          campaignId: campaign.id,
+          segmentId,
+        }))
+      );
+      console.log(
+        `[Create Campaign] Linked ${segmentIds.length} existing segments to campaign ${campaign.id}`
       );
     }
 

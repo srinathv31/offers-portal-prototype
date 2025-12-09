@@ -3,13 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardAction,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AccountTierBadge } from "@/components/account-tier-badge";
 import { SpendingGroupAccountsDialog } from "@/components/spending-group-accounts-dialog";
 import type { AccountTier } from "@/lib/db/schema";
-import { Users, DollarSign, ChevronDown, ChevronUp, Link as LinkIcon } from "lucide-react";
+import {
+  Users,
+  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  Link as LinkIcon,
+  Sparkles,
+} from "lucide-react";
 
 interface Account {
   id: string;
@@ -47,6 +60,7 @@ function formatCurrency(cents: number): string {
 }
 
 export function SpendingGroupCard({
+  id,
   name,
   description,
   accountCount,
@@ -63,40 +77,44 @@ export function SpendingGroupCard({
   return (
     <Card className={cn("overflow-hidden", className)}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg">{name}</CardTitle>
-            {description && (
-              <p className="text-sm text-muted-foreground mt-1">{description}</p>
-            )}
+        <CardTitle className="text-lg break-words">{name}</CardTitle>
+        {description && (
+          <p className="text-sm text-muted-foreground mt-1 break-words">
+            {description}
+          </p>
+        )}
+        <CardAction>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex-shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex-shrink-0"
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        </CardAction>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="text-sm">
-              <span className="font-medium">{accountCount.toLocaleString()}</span>{" "}
+              <span className="font-medium">
+                {accountCount.toLocaleString()}
+              </span>{" "}
               <span className="text-muted-foreground">accounts</span>
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="text-sm">
               <span className="font-medium">{formatCurrency(avgSpend)}</span>{" "}
               <span className="text-muted-foreground">avg spend</span>
@@ -108,18 +126,39 @@ export function SpendingGroupCard({
         {segments.length > 0 && (
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-              <LinkIcon className="h-3 w-3" />
+              <LinkIcon className="h-3 w-3 flex-shrink-0" />
               Linked Segments
             </p>
             <div className="flex flex-wrap gap-2">
               {segments.map((segment) => (
-                <Badge key={segment.id} variant="outline" className="text-xs">
+                <Badge
+                  key={segment.id}
+                  variant="outline"
+                  className="text-xs whitespace-nowrap"
+                >
                   {segment.name}
                 </Badge>
               ))}
             </div>
           </div>
         )}
+
+        <CardAction className="flex w-full">
+          <Link
+            href={`/create-campaign?spendingGroupId=${id}`}
+            className="w-full"
+          >
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5 whitespace-nowrap w-full"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Create Campaign</span>
+              <span className="sm:hidden">Create</span>
+            </Button>
+          </Link>
+        </CardAction>
 
         {/* Expanded Account List */}
         {isExpanded && displayedAccounts.length > 0 && (
@@ -156,7 +195,11 @@ export function SpendingGroupCard({
                     <span className="font-medium">
                       {account.firstName} {account.lastName}
                     </span>
-                    <AccountTierBadge tier={account.tier} showIcon={false} className="text-xs" />
+                    <AccountTierBadge
+                      tier={account.tier}
+                      showIcon={false}
+                      className="text-xs"
+                    />
                   </div>
                   <span className="text-muted-foreground">
                     {formatCurrency(account.annualSpend)}
@@ -183,4 +226,3 @@ export function SpendingGroupCard({
     </Card>
   );
 }
-

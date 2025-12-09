@@ -45,6 +45,24 @@ export function getCurrentSeason(): string {
 function generateMockStrategy(input: StrategyInput): StrategySuggestion {
   const { season, objective } = input;
 
+  // Check if there's spending group context in the objective
+  const hasSpendingGroupContext = objective?.includes("[Context: Targeting the");
+  let spendingGroupName = "";
+  let spendingGroupAccountCount = 0;
+  
+  if (hasSpendingGroupContext) {
+    // Extract spending group name from context
+    const nameMatch = objective?.match(/Targeting the "([^"]+)" spending group/);
+    if (nameMatch) {
+      spendingGroupName = nameMatch[1];
+    }
+    // Extract account count
+    const countMatch = objective?.match(/with (\d+(?:,\d+)*) accounts/);
+    if (countMatch) {
+      spendingGroupAccountCount = parseInt(countMatch[1].replace(/,/g, ""));
+    }
+  }
+
   // Determine season for logic
   const seasonToUse = season || getCurrentSeason();
   const seasonLower = seasonToUse.toLowerCase();
@@ -68,6 +86,180 @@ function generateMockStrategy(input: StrategyInput): StrategySuggestion {
     "WEB",
   ];
   const notes = [];
+
+  // If spending group context exists, customize the strategy
+  if (hasSpendingGroupContext && spendingGroupName) {
+    nameHint = `${spendingGroupName} Rewards Campaign`;
+    
+    // Keep the user's objective as the purpose
+    purposeHint = objective;
+
+    // Detect spending group type and customize offers accordingly
+    const groupLower = spendingGroupName.toLowerCase();
+    
+    if (groupLower.includes("premium") || groupLower.includes("travel")) {
+      // Premium/Travel focused offers
+      recommendedOffers.push(
+        {
+          name: "5× Points on Airlines & Hotels",
+          type: "POINTS_MULTIPLIER" as const,
+          vendor: "Delta Airlines, Marriott, Hilton",
+          reasoning: `Tailored for ${spendingGroupName} members who frequently travel`,
+        },
+        {
+          name: "10% Cashback on Luxury Retail",
+          type: "CASHBACK" as const,
+          vendor: "Nordstrom, Saks Fifth Avenue",
+          reasoning: "Premium customers appreciate high-value rewards on luxury purchases",
+        },
+        {
+          name: "Airport Lounge Access Bonus",
+          type: "BONUS" as const,
+          reasoning: "Exclusive benefit that appeals to frequent travelers",
+        }
+      );
+      
+      segments.push({
+        name: spendingGroupName,
+        source: "CUSTOM" as const,
+        criteria: `Pre-defined segment from spending group analysis with ${spendingGroupAccountCount} accounts`,
+      });
+      
+      notes.push(
+        `Campaign specifically designed for ${spendingGroupName} group`,
+        "Consider exclusive premium experiences to drive engagement",
+        "Monitor travel spend trends to optimize timing"
+      );
+    } else if (groupLower.includes("everyday") || groupLower.includes("essential")) {
+      // Everyday spending focused offers
+      recommendedOffers.push(
+        {
+          name: "5% Cashback on Groceries",
+          type: "CASHBACK" as const,
+          vendor: "Whole Foods, Kroger, Safeway",
+          reasoning: `${spendingGroupName} customers focus on regular grocery spending`,
+        },
+        {
+          name: "3× Points on Gas Stations",
+          type: "POINTS_MULTIPLIER" as const,
+          vendor: "Shell, BP, Chevron",
+          reasoning: "Everyday commuters benefit from gas station rewards",
+        },
+        {
+          name: "Bonus Points on $500 Monthly Spend",
+          type: "BONUS" as const,
+          reasoning: "Incentivizes consistent card usage for daily purchases",
+        }
+      );
+      
+      segments.push({
+        name: spendingGroupName,
+        source: "CUSTOM" as const,
+        criteria: `Pre-defined segment from spending group analysis with ${spendingGroupAccountCount} accounts`,
+      });
+      
+      notes.push(
+        `Campaign specifically designed for ${spendingGroupName} group`,
+        "Focus on consistent engagement through daily spend categories",
+        "Consider adding rotating bonus categories"
+      );
+    } else if (groupLower.includes("dining") || groupLower.includes("restaurant")) {
+      // Dining focused offers
+      recommendedOffers.push(
+        {
+          name: "8% Cashback on Dining",
+          type: "CASHBACK" as const,
+          vendor: "All Restaurants, Uber Eats, DoorDash",
+          reasoning: `${spendingGroupName} members show strong dining spending patterns`,
+        },
+        {
+          name: "4× Points on Food Delivery",
+          type: "POINTS_MULTIPLIER" as const,
+          vendor: "DoorDash, Uber Eats, Grubhub",
+          reasoning: "Food delivery is a growing category for this group",
+        },
+        {
+          name: "Dining Credit Bonus",
+          type: "BONUS" as const,
+          vendor: "Select Restaurants",
+          reasoning: "Encourages trying new restaurants",
+        }
+      );
+      
+      segments.push({
+        name: spendingGroupName,
+        source: "CUSTOM" as const,
+        criteria: `Pre-defined segment from spending group analysis with ${spendingGroupAccountCount} accounts`,
+      });
+      
+      notes.push(
+        `Campaign specifically designed for ${spendingGroupName} group`,
+        "Partner with popular local restaurants for exclusive deals",
+        "Consider weekday vs weekend dining patterns"
+      );
+    } else {
+      // Generic spending group - use balanced approach
+      recommendedOffers.push(
+        {
+          name: "3× Points on All Purchases",
+          type: "POINTS_MULTIPLIER" as const,
+          reasoning: `Broad appeal for ${spendingGroupName} segment`,
+        },
+        {
+          name: "Flexible Cashback on Top Categories",
+          type: "CASHBACK" as const,
+          vendor: "Top 3 Spending Categories",
+          reasoning: `Personalized to ${spendingGroupName} spending patterns`,
+        },
+        {
+          name: `Bonus Rewards for ${spendingGroupName}`,
+          type: "BONUS" as const,
+          reasoning: "Incentivizes increased engagement",
+        }
+      );
+      
+      segments.push({
+        name: spendingGroupName,
+        source: "CUSTOM" as const,
+        criteria: `Pre-defined segment from spending group analysis with ${spendingGroupAccountCount} accounts`,
+      });
+      
+      notes.push(
+        `Campaign tailored for ${spendingGroupName} spending group`,
+        "Analyze top spending categories to refine offers",
+        `Target audience: ${spendingGroupAccountCount.toLocaleString()} accounts`
+      );
+    }
+
+    // Generate timeline
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() + 7); // Start in 1 week
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 45); // 45-day campaign
+
+    const formatDate = (date: Date) => date.toISOString().split("T")[0];
+
+    return {
+      nameHint,
+      purposeHint,
+      recommendedOffers,
+      segments,
+      channels: ["EMAIL", "MOBILE", "WEB"],
+      timelines: {
+        recommendedStart: formatDate(startDate),
+        recommendedEnd: formatDate(endDate),
+        rationale: `45-day campaign optimized for ${spendingGroupName} engagement patterns`,
+      },
+      notes,
+      vendorHintsByOfferType: {
+        CASHBACK: ["Based on group spending patterns"],
+        POINTS_MULTIPLIER: ["Targeted to group preferences"],
+        DISCOUNT: ["Exclusive deals for this segment"],
+        BONUS: ["Engagement incentives"],
+      },
+    };
+  }
 
   // Generate offers and segments based on season
   if (isHoliday) {

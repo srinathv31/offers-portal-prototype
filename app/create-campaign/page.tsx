@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,12 +26,34 @@ import {
   RefreshCw,
   Zap,
   Pencil,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import type { StrategySuggestion } from "@/lib/ai/types";
-import type { OfferType } from "@/lib/db/schema";
+import type { OfferType, SegmentSource } from "@/lib/db/schema";
 import { getCurrentSeason } from "@/lib/ai/strategy";
 import { OfferCard } from "@/components/offer-card";
+
+// Spending group context interface
+interface SpendingGroupContext {
+  id: string;
+  name: string;
+  description: string | null;
+  accountCount: number;
+  avgSpend: number;
+  criteria: {
+    minAnnualSpend?: number;
+    maxAnnualSpend?: number;
+    tiers?: string[];
+    categories?: string[];
+    minTransactions?: number;
+  } | null;
+  segments: Array<{
+    id: string;
+    name: string;
+    source: SegmentSource;
+  }>;
+}
 
 type Step = "choice" | "input" | "suggestion" | "manual";
 type WorkflowMode = "ai-assisted" | "manual" | null;
@@ -46,6 +68,9 @@ interface Offer {
 
 export default function CreateCampaignPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const spendingGroupId = searchParams.get("spendingGroupId");
+
   const [step, setStep] = useState<Step>("choice");
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(null);
   const [loading, setLoading] = useState(false);
@@ -59,10 +84,134 @@ export default function CreateCampaignPage() {
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState<StrategySuggestion | null>(null);
 
+  // Spending group context state
+  const [spendingGroupContext, setSpendingGroupContext] =
+    useState<SpendingGroupContext | null>(null);
+  const [loadingSpendingGroup, setLoadingSpendingGroup] = useState(false);
+  const [spendingGroupSegmentIds, setSpendingGroupSegmentIds] = useState<
+    string[]
+  >([]);
+
   // Offer selection state
   const [availableOffers, setAvailableOffers] = useState<Offer[]>([]);
   const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
+
+  // Format currency helper
+  const formatCurrency = (cents: number): string => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(cents / 100);
+  };
+
+  // Generate AI suggestion with spending group context
+  const triggerAISuggestion = useCallback(
+    async (
+      purposeOverride?: string,
+      groupContext?: SpendingGroupContext | null
+    ) => {
+      setLoading(true);
+      setError(null);
+      setWorkflowMode("ai-assisted");
+
+      try {
+        const response = await fetch("/api/ai/suggest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            season: season || undefined,
+            objective: purposeOverride || campaignPurpose || "",
+            spendingGroupContext: groupContext
+              ? {
+                  name: groupContext.name,
+                  accountCount: groupContext.accountCount,
+                  avgSpend: groupContext.avgSpend,
+                  criteria: groupContext.criteria,
+                  segments: groupContext.segments.map((s) => s.name),
+                }
+              : undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to get AI suggestion");
+        }
+
+        const data = await response.json();
+        setSuggestion(data.suggestion);
+        setStep("suggestion");
+
+        // Apply hints only if name/purpose not already set
+        if (data.suggestion.nameHint && !campaignName) {
+          setCampaignName(data.suggestion.nameHint);
+        }
+        if (
+          data.suggestion.purposeHint &&
+          !purposeOverride &&
+          !campaignPurpose
+        ) {
+          setCampaignPurpose(data.suggestion.purposeHint);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to get suggestion"
+        );
+        setStep("input"); // Go back to input on error
+      } finally {
+        setLoading(false);
+      }
+    },
+    [season, campaignPurpose, campaignName]
+  );
+
+  // Fetch spending group data if coming from a spending group
+  useEffect(() => {
+    if (!spendingGroupId) return;
+
+    const fetchSpendingGroup = async () => {
+      setLoadingSpendingGroup(true);
+      try {
+        const res = await fetch(`/api/spending-groups/${spendingGroupId}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch spending group");
+        }
+        const data: SpendingGroupContext = await res.json();
+        setSpendingGroupContext(data);
+
+        // Store segment IDs to link to campaign
+        setSpendingGroupSegmentIds(data.segments.map((s) => s.id));
+
+        // Pre-populate campaign name and purpose
+        const name = `Campaign for ${data.name}`;
+        const purpose = `Target ${data.accountCount.toLocaleString()} accounts in the "${
+          data.name
+        }" spending group with avg spend of ${formatCurrency(data.avgSpend)}${
+          data.description ? `. ${data.description}` : ""
+        }`;
+
+        setCampaignName(name);
+        setCampaignPurpose(purpose);
+
+        // Skip choice screen and trigger AI suggestion directly
+        setWorkflowMode("ai-assisted");
+
+        // Trigger AI suggestion with the pre-populated data
+        setTimeout(() => {
+          triggerAISuggestion(purpose, data);
+        }, 100);
+      } catch (err) {
+        console.error("Failed to fetch spending group:", err);
+        setError("Failed to load spending group data. Please try again.");
+      } finally {
+        setLoadingSpendingGroup(false);
+      }
+    };
+
+    fetchSpendingGroup();
+  }, [spendingGroupId, triggerAISuggestion]);
 
   // Fetch available offers
   useEffect(() => {
@@ -93,41 +242,7 @@ export default function CreateCampaignPage() {
   };
 
   const handleAIAssistedChoice = async () => {
-    setWorkflowMode("ai-assisted");
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/ai/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          season: season || undefined,
-          objective: campaignPurpose || "",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get AI suggestion");
-      }
-
-      const data = await response.json();
-      setSuggestion(data.suggestion);
-      setStep("suggestion");
-
-      // Apply hints
-      if (data.suggestion.nameHint && !campaignName) {
-        setCampaignName(data.suggestion.nameHint);
-      }
-      if (data.suggestion.purposeHint && !campaignPurpose) {
-        setCampaignPurpose(data.suggestion.purposeHint);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get suggestion");
-      setStep("input"); // Go back to input on error
-    } finally {
-      setLoading(false);
-    }
+    await triggerAISuggestion(undefined, spendingGroupContext);
   };
 
   const handleManualChoice = () => {
@@ -136,40 +251,7 @@ export default function CreateCampaignPage() {
   };
 
   const handleGetSuggestion = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/ai/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          season: season || undefined,
-          objective: campaignPurpose || "",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get AI suggestion");
-      }
-
-      const data = await response.json();
-      setSuggestion(data.suggestion);
-      setStep("suggestion");
-
-      // Apply hints
-      if (data.suggestion.nameHint && !campaignName) {
-        setCampaignName(data.suggestion.nameHint);
-      }
-      if (data.suggestion.purposeHint && !campaignPurpose) {
-        setCampaignPurpose(data.suggestion.purposeHint);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get suggestion");
-      setStep("input"); // Go back to input on error
-    } finally {
-      setLoading(false);
-    }
+    await triggerAISuggestion(undefined, spendingGroupContext);
   };
 
   const handleCreateManualCampaign = async () => {
@@ -187,6 +269,10 @@ export default function CreateCampaignPage() {
           endDate: endDate || undefined,
           channels: selectedChannels.length > 0 ? selectedChannels : undefined,
           offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
+          segmentIds:
+            spendingGroupSegmentIds.length > 0
+              ? spendingGroupSegmentIds
+              : undefined,
         }),
       });
 
@@ -225,6 +311,10 @@ export default function CreateCampaignPage() {
           purpose: campaignPurpose,
           suggestion,
           offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
+          segmentIds:
+            spendingGroupSegmentIds.length > 0
+              ? spendingGroupSegmentIds
+              : undefined,
         }),
       });
 
@@ -242,17 +332,52 @@ export default function CreateCampaignPage() {
     }
   };
 
+  // Show loading state while fetching spending group
+  if (loadingSpendingGroup) {
+    return (
+      <div className="min-h-screen">
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto px-4 py-6">
+            <Skeleton className="h-5 w-32 mb-4" />
+            <Skeleton className="h-10 w-64 mb-2" />
+            <Skeleton className="h-5 w-96" />
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                <CardTitle>Loading Spending Group...</CardTitle>
+              </div>
+              <CardDescription>
+                Preparing AI-assisted campaign creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-6">
           <Link
-            href="/"
+            href={spendingGroupContext ? "/spending-groups" : "/"}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            {spendingGroupContext
+              ? "Back to Spending Groups"
+              : "Back to Dashboard"}
           </Link>
           <h1 className="text-4xl font-bold tracking-tight">
             Create New Campaign
@@ -260,12 +385,38 @@ export default function CreateCampaignPage() {
           <p className="text-muted-foreground mt-2">
             Design a new offers campaign with AI-powered strategy suggestions
           </p>
+          {/* Spending Group Context Banner */}
+          {spendingGroupContext && (
+            <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4 text-primary" />
+                <span className="font-medium">Creating campaign for:</span>
+                <Badge variant="secondary" className="font-semibold">
+                  {spendingGroupContext.name}
+                </Badge>
+                <span className="text-muted-foreground">
+                  ({spendingGroupContext.accountCount.toLocaleString()} accounts
+                  • {formatCurrency(spendingGroupContext.avgSpend)} avg spend)
+                </span>
+              </div>
+              {spendingGroupContext.segments.length > 0 && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                  <span>Linked segments:</span>
+                  {spendingGroupContext.segments.map((seg) => (
+                    <Badge key={seg.id} variant="outline" className="text-xs">
+                      {seg.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Workflow Choice Screen */}
-        {step === "choice" && (
+        {/* Workflow Choice Screen - Only show if NOT coming from spending group */}
+        {step === "choice" && !spendingGroupContext && (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold mb-2">Choose Your Workflow</h2>
