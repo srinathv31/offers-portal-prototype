@@ -5,7 +5,10 @@ import { getAccountWithDetails } from "@/lib/db";
 import { AccountTierBadge } from "@/components/account-tier-badge";
 import { AccountStatusBadge } from "@/components/account-status-badge";
 import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
-import { TransactionTable } from "@/components/transaction-table";
+import { AccountTransactionsTab } from "@/components/account-transactions-tab";
+import { CreditCardProductBadge } from "@/components/credit-card-product-badge";
+import { getCreditCardProductDescription } from "@/lib/credit-card-utils";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +21,9 @@ import {
   Wallet,
   Target,
   Users,
+  Star,
+  Clock,
+  Activity,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -48,6 +54,7 @@ async function AccountDetailContent({ id }: { id: string }) {
   const spendingGroups = account.spendingGroupAccounts?.map(
     (sga) => sga.spendingGroup
   ) || [];
+  const creditCards = account.accountCreditCards || [];
 
   // Group enrollments by status
   const enrollmentsByStatus = {
@@ -165,9 +172,10 @@ async function AccountDetailContent({ id }: { id: string }) {
       {/* Content Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="enrollments" className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
             <TabsTrigger value="groups">Spending Groups</TabsTrigger>
           </TabsList>
 
@@ -278,28 +286,170 @@ async function AccountDetailContent({ id }: { id: string }) {
 
           {/* Transactions Tab */}
           <TabsContent value="transactions">
+            <AccountTransactionsTab
+              accountId={account.id}
+              initialTransactions={transactions.map((tx) => ({
+                id: tx.id,
+                transactionDate: tx.transactionDate.toISOString(),
+                merchant: tx.merchant,
+                category: tx.category,
+                amount: tx.amount,
+                qualifiesForOffer: tx.qualifiesForOffer,
+                creditCard: tx.creditCard
+                  ? {
+                      id: tx.creditCard.id,
+                      creditCardProduct: tx.creditCard.creditCardProduct,
+                      lastFourDigits: tx.creditCard.lastFourDigits,
+                    }
+                  : null,
+              }))}
+            />
+          </TabsContent>
+
+          {/* Credit Cards Tab */}
+          <TabsContent value="credit-cards">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Credit Cards ({creditCards.length})
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {transactions.length > 0 ? (
-                  <TransactionTable
-                    transactions={transactions.map((tx) => ({
-                      id: tx.id,
-                      transactionDate: tx.transactionDate,
-                      merchant: tx.merchant,
-                      category: tx.category,
-                      amount: tx.amount,
-                      qualifiesForOffer: tx.qualifiesForOffer,
-                    }))}
-                    showQualified={true}
-                  />
+                {creditCards.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {creditCards.map((acc) => {
+                      const card = acc.creditCard;
+                      return (
+                        <div
+                          key={card.id}
+                          className="relative p-5 rounded-xl border bg-gradient-to-br from-card to-muted/30 space-y-4"
+                        >
+                          {/* Primary Badge */}
+                          {acc.isPrimary && (
+                            <Badge
+                              variant="secondary"
+                              className="absolute top-3 right-3 bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                            >
+                              <Star className="h-3 w-3 mr-1 fill-current" />
+                              Primary
+                            </Badge>
+                          )}
+
+                          {/* Card Product & Number */}
+                          <div className="space-y-1">
+                            <CreditCardProductBadge
+                              product={card.creditCardProduct}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {getCreditCardProductDescription(
+                                card.creditCardProduct
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Card Number */}
+                          <p className="font-mono text-lg tracking-wider">
+                            {card.cardNumber}
+                          </p>
+
+                          {/* Financial Info */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Credit Limit
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(card.creditLimit)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Current Balance
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(card.currentBalance)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Dates */}
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                Opened{" "}
+                                {format(new Date(card.openedAt), "MMM yyyy")}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                Expires{" "}
+                                {format(
+                                  new Date(card.expirationDate),
+                                  "MM/yy"
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Usage Stats */}
+                          <div className="pt-3 border-t space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <Activity className="h-4 w-4" />
+                                Usage Count
+                              </span>
+                              <span className="font-medium">
+                                {acc.usageCount} transactions
+                              </span>
+                            </div>
+                            {acc.lastUsedAt && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                  Last Used
+                                </span>
+                                <span>
+                                  {format(
+                                    new Date(acc.lastUsedAt),
+                                    "MMM d, yyyy"
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {acc.preferredForCategory && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                  Preferred For
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {acc.preferredForCategory}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                card.isActive ? "bg-green-500" : "bg-red-500"
+                              }`}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {card.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="py-12 text-center">
                     <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">
-                      No transactions found
+                      No credit cards associated with this account
                     </p>
                   </div>
                 )}

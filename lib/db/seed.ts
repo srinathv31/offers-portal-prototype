@@ -7,9 +7,11 @@ async function seed() {
   // Clear existing data (in reverse order of dependencies)
   console.log("Clearing existing data...");
 
-  // Clear account-level data first
+  // Clear account-level data first (in reverse order of dependencies)
   await db.delete(schema.accountTransactions);
   await db.delete(schema.accountOfferEnrollments);
+  await db.delete(schema.accountCreditCards);
+  await db.delete(schema.creditCards);
   await db.delete(schema.spendingGroupAccounts);
   await db.delete(schema.segmentSpendingGroups);
   await db.delete(schema.spendingGroups);
@@ -908,7 +910,7 @@ async function seed() {
         tiers: ["PLATINUM" as const, "DIAMOND" as const],
         categories: ["Travel", "Airlines", "Hotels"],
       },
-      accountCount: 6,
+      accountCount: 15,
       avgSpend: 9500000, // $95,000
     },
     {
@@ -919,7 +921,7 @@ async function seed() {
         categories: ["Groceries", "Gas Stations"],
         minTransactions: 20,
       },
-      accountCount: 10,
+      accountCount: 14,
       avgSpend: 2500000, // $25,000
     },
     {
@@ -929,7 +931,7 @@ async function seed() {
         categories: ["Online Shopping", "Amazon"],
         minTransactions: 15,
       },
-      accountCount: 8,
+      accountCount: 12,
       avgSpend: 3200000, // $32,000
     },
     {
@@ -939,7 +941,7 @@ async function seed() {
         categories: ["Dining", "Restaurants", "Food Delivery"],
         minAnnualSpend: 300000, // $3,000
       },
-      accountCount: 12,
+      accountCount: 13,
       avgSpend: 1800000, // $18,000
     },
     {
@@ -949,7 +951,7 @@ async function seed() {
         minAnnualSpend: 7500000, // $75,000
         tiers: ["PLATINUM" as const, "DIAMOND" as const],
       },
-      accountCount: 5,
+      accountCount: 8,
       avgSpend: 11000000, // $110,000
     },
   ];
@@ -960,163 +962,328 @@ async function seed() {
     .returning();
   console.log(`✓ Created ${createdSpendingGroups.length} spending groups`);
 
-  // Link accounts to spending groups
+  // Link accounts to spending groups (expanded to up to 15 per group)
   console.log("Linking accounts to spending groups...");
   const spendingGroupAccountsData = [
-    // Premium Travelers - DIAMOND and PLATINUM high spenders
+    // Premium Travelers - DIAMOND and PLATINUM high spenders (15 accounts)
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[0].id,
       score: 100,
-    }, // Victoria (DIAMOND)
+    }, // Victoria
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[1].id,
       score: 95,
-    }, // Alexander (DIAMOND)
+    }, // Alexander
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[2].id,
       score: 90,
-    }, // Isabella (DIAMOND)
+    }, // Isabella
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[3].id,
+      score: 88,
+    }, // William
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[4].id,
       score: 85,
-    }, // Sophia (PLATINUM)
+    }, // Sophia
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[5].id,
       score: 80,
-    }, // James (PLATINUM)
+    }, // James
     {
       spendingGroupId: createdSpendingGroups[0].id,
       accountId: createdAccounts[6].id,
       score: 75,
-    }, // Emma (PLATINUM)
+    }, // Emma
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[7].id,
+      score: 70,
+    }, // Daniel
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[8].id,
+      score: 65,
+    }, // Olivia
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[9].id,
+      score: 60,
+    }, // Michael
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[10].id,
+      score: 55,
+    }, // Ava
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[11].id,
+      score: 50,
+    }, // Ethan
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[12].id,
+      score: 45,
+    }, // Mia
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[13].id,
+      score: 40,
+    }, // Benjamin
+    {
+      spendingGroupId: createdSpendingGroups[0].id,
+      accountId: createdAccounts[14].id,
+      score: 35,
+    }, // Charlotte
 
-    // Everyday Essentials - mix of tiers, groceries focus
+    // Everyday Essentials - mix of tiers, groceries focus (14 accounts)
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[9].id,
-      score: 90,
-    }, // Michael (GOLD)
+      score: 95,
+    }, // Michael
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[10].id,
-      score: 85,
-    }, // Ava (GOLD)
+      score: 90,
+    }, // Ava
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[11].id,
-      score: 80,
-    }, // Ethan (GOLD)
+      score: 85,
+    }, // Ethan
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[12].id,
+      score: 80,
+    }, // Mia
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[13].id,
       score: 75,
-    }, // Mia (GOLD)
+    }, // Benjamin
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[14].id,
+      score: 70,
+    }, // Charlotte
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[15].id,
-      score: 70,
-    }, // Lucas (STANDARD)
+      score: 65,
+    }, // Lucas
     {
       spendingGroupId: createdSpendingGroups[1].id,
       accountId: createdAccounts[16].id,
-      score: 65,
-    }, // Amelia (STANDARD)
+      score: 60,
+    }, // Amelia
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[17].id,
+      score: 55,
+    }, // Henry
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[18].id,
+      score: 50,
+    }, // Harper
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[6].id,
+      score: 45,
+    }, // Emma
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[7].id,
+      score: 40,
+    }, // Daniel
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[4].id,
+      score: 35,
+    }, // Sophia
+    {
+      spendingGroupId: createdSpendingGroups[1].id,
+      accountId: createdAccounts[5].id,
+      score: 30,
+    }, // James
 
-    // Online Shoppers - Amazon heavy users
+    // Online Shoppers - Amazon heavy users (12 accounts)
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[3].id,
       score: 95,
-    }, // William (DIAMOND)
+    }, // William
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[7].id,
       score: 90,
-    }, // Daniel (PLATINUM)
+    }, // Daniel
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[8].id,
       score: 85,
-    }, // Olivia (PLATINUM)
+    }, // Olivia
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[13].id,
       score: 80,
-    }, // Benjamin (GOLD)
+    }, // Benjamin
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[17].id,
-      score: 70,
-    }, // Henry (STANDARD)
+      score: 75,
+    }, // Henry
     {
       spendingGroupId: createdSpendingGroups[2].id,
       accountId: createdAccounts[18].id,
+      score: 70,
+    }, // Harper
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[15].id,
       score: 65,
-    }, // Harper (STANDARD)
+    }, // Lucas
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[16].id,
+      score: 60,
+    }, // Amelia
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[11].id,
+      score: 55,
+    }, // Ethan
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[12].id,
+      score: 50,
+    }, // Mia
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[1].id,
+      score: 45,
+    }, // Alexander
+    {
+      spendingGroupId: createdSpendingGroups[2].id,
+      accountId: createdAccounts[2].id,
+      score: 40,
+    }, // Isabella
 
-    // Dining Enthusiasts - restaurant spenders
+    // Dining Enthusiasts - restaurant spenders (13 accounts)
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[1].id,
-      score: 90,
-    }, // Alexander (DIAMOND)
+      score: 95,
+    }, // Alexander
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[4].id,
-      score: 85,
-    }, // Sophia (PLATINUM)
+      score: 90,
+    }, // Sophia
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[6].id,
-      score: 80,
-    }, // Emma (PLATINUM)
+      score: 85,
+    }, // Emma
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[10].id,
-      score: 75,
-    }, // Ava (GOLD)
+      score: 80,
+    }, // Ava
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[12].id,
-      score: 70,
-    }, // Mia (GOLD)
+      score: 75,
+    }, // Mia
     {
       spendingGroupId: createdSpendingGroups[3].id,
       accountId: createdAccounts[16].id,
+      score: 70,
+    }, // Amelia
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[0].id,
       score: 65,
-    }, // Amelia (STANDARD)
+    }, // Victoria
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[8].id,
+      score: 60,
+    }, // Olivia
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[9].id,
+      score: 55,
+    }, // Michael
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[11].id,
+      score: 50,
+    }, // Ethan
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[13].id,
+      score: 45,
+    }, // Benjamin
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[15].id,
+      score: 40,
+    }, // Lucas
+    {
+      spendingGroupId: createdSpendingGroups[3].id,
+      accountId: createdAccounts[17].id,
+      score: 35,
+    }, // Henry
 
-    // High Value Customers - top spenders only
+    // High Value Customers - top spenders only (8 accounts)
     {
       spendingGroupId: createdSpendingGroups[4].id,
       accountId: createdAccounts[0].id,
       score: 100,
-    }, // Victoria (DIAMOND)
+    }, // Victoria
     {
       spendingGroupId: createdSpendingGroups[4].id,
       accountId: createdAccounts[1].id,
       score: 95,
-    }, // Alexander (DIAMOND)
+    }, // Alexander
     {
       spendingGroupId: createdSpendingGroups[4].id,
       accountId: createdAccounts[2].id,
       score: 90,
-    }, // Isabella (DIAMOND)
+    }, // Isabella
     {
       spendingGroupId: createdSpendingGroups[4].id,
       accountId: createdAccounts[3].id,
-      score: 85,
-    }, // William (DIAMOND)
+      score: 88,
+    }, // William
     {
       spendingGroupId: createdSpendingGroups[4].id,
       accountId: createdAccounts[4].id,
+      score: 85,
+    }, // Sophia
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[5].id,
       score: 80,
-    }, // Sophia (PLATINUM)
+    }, // James
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[6].id,
+      score: 75,
+    }, // Emma
+    {
+      spendingGroupId: createdSpendingGroups[4].id,
+      accountId: createdAccounts[7].id,
+      score: 70,
+    }, // Daniel
   ];
 
   await db

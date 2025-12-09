@@ -9,8 +9,11 @@ export const dynamic = "force-dynamic";
 async function SpendingGroupsContent() {
   const groups = await getAllSpendingGroups();
 
-  // Calculate totals
-  const totalAccounts = groups.reduce((sum, g) => sum + g.accountCount, 0);
+  // Calculate totals using actual account counts from relations
+  const totalAccounts = groups.reduce(
+    (sum, g) => sum + g.spendingGroupAccounts.length,
+    0
+  );
   const avgSpendAcrossGroups =
     groups.length > 0
       ? groups.reduce((sum, g) => sum + g.avgSpend, 0) / groups.length
@@ -81,7 +84,7 @@ async function SpendingGroupsContent() {
                 id={group.id}
                 name={group.name}
                 description={group.description}
-                accountCount={group.accountCount}
+                accountCount={group.spendingGroupAccounts.length}
                 avgSpend={group.avgSpend}
                 accounts={group.spendingGroupAccounts.map((sga) => ({
                   id: sga.account.id,

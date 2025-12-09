@@ -235,8 +235,16 @@ export async function getAccountWithDetails(accountId: string) {
         orderBy: (enrollments, { desc }) => [desc(enrollments.enrolledAt)],
       },
       accountTransactions: {
+        with: {
+          creditCard: true,
+        },
         orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
         limit: 100,
+      },
+      accountCreditCards: {
+        with: {
+          creditCard: true,
+        },
       },
       spendingGroupAccounts: {
         with: {
@@ -345,4 +353,37 @@ export async function getEnrollmentWithTransactions(enrollmentId: string) {
   });
 
   return enrollment;
+}
+
+// ==========================================
+// TRANSACTION HELPERS
+// ==========================================
+
+export interface TransactionFilters {
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export async function getAccountTransactions(
+  accountId: string,
+  filters?: TransactionFilters
+) {
+  const transactions = await db.query.accountTransactions.findMany({
+    where: (tx, { eq, and, gte, lte }) => {
+      const conditions = [eq(tx.accountId, accountId)];
+      if (filters?.startDate) {
+        conditions.push(gte(tx.transactionDate, filters.startDate));
+      }
+      if (filters?.endDate) {
+        conditions.push(lte(tx.transactionDate, filters.endDate));
+      }
+      return and(...conditions);
+    },
+    with: {
+      creditCard: true,
+    },
+    orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+  });
+
+  return transactions;
 }

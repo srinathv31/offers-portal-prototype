@@ -74,6 +74,14 @@ export const enrollmentStatusEnum = pgEnum("enrollment_status", [
   "OPTED_OUT",
 ]);
 
+export const creditCardProductEnum = pgEnum("credit_card_product", [
+  "FLEXPAY",
+  "DOUBLE_UP",
+  "CASH_CREDIT",
+  "FIRST_CLASS",
+  "CLEAR",
+]);
+
 // TypeScript types from enums
 export type CampaignStatus =
   | "DRAFT"
@@ -97,6 +105,12 @@ export type EnrollmentStatus =
   | "COMPLETED"
   | "EXPIRED"
   | "OPTED_OUT";
+export type CreditCardProduct =
+  | "FLEXPAY"
+  | "DOUBLE_UP"
+  | "CASH_CREDIT"
+  | "FIRST_CLASS"
+  | "CLEAR";
 
 // ==========================================
 // ACCOUNT-LEVEL TABLES
@@ -174,12 +188,43 @@ export const accountOfferEnrollments = pgTable("account_offer_enrollments", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Credit Cards - Individual credit card entities
+export const creditCards = pgTable("credit_cards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  creditCardProduct: creditCardProductEnum("credit_card_product").notNull(),
+  cardNumber: text("card_number").notNull(), // masked like ****1234
+  lastFourDigits: text("last_four_digits").notNull(),
+  creditLimit: integer("credit_limit").notNull(), // in cents
+  currentBalance: integer("current_balance").notNull().default(0), // in cents
+  openedAt: timestamp("opened_at").notNull(),
+  expirationDate: timestamp("expiration_date").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Junction: Accounts to Credit Cards with usage metadata
+export const accountCreditCards = pgTable("account_credit_cards", {
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  creditCardId: uuid("credit_card_id")
+    .notNull()
+    .references(() => creditCards.id),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+  usageCount: integer("usage_count").notNull().default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  preferredForCategory: text("preferred_for_category"), // e.g., "Dining", "Travel"
+});
+
 // Account Transactions - Individual transactions for progress tracking
 export const accountTransactions = pgTable("account_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
   accountId: uuid("account_id")
     .notNull()
     .references(() => accounts.id),
+  creditCardId: uuid("credit_card_id").references(() => creditCards.id), // which card was used
   enrollmentId: uuid("enrollment_id").references(
     () => accountOfferEnrollments.id
   ), // nullable - links to specific offer enrollment
@@ -415,6 +460,7 @@ export const accountsRelations = relations(accounts, ({ many }) => ({
   spendingGroupAccounts: many(spendingGroupAccounts),
   accountOfferEnrollments: many(accountOfferEnrollments),
   accountTransactions: many(accountTransactions),
+  accountCreditCards: many(accountCreditCards),
 }));
 
 export const spendingGroupsRelations = relations(
@@ -482,6 +528,30 @@ export const accountTransactionsRelations = relations(
     enrollment: one(accountOfferEnrollments, {
       fields: [accountTransactions.enrollmentId],
       references: [accountOfferEnrollments.id],
+    }),
+    creditCard: one(creditCards, {
+      fields: [accountTransactions.creditCardId],
+      references: [creditCards.id],
+    }),
+  })
+);
+
+// Credit Card relations
+export const creditCardsRelations = relations(creditCards, ({ many }) => ({
+  accountCreditCards: many(accountCreditCards),
+  accountTransactions: many(accountTransactions),
+}));
+
+export const accountCreditCardsRelations = relations(
+  accountCreditCards,
+  ({ one }) => ({
+    account: one(accounts, {
+      fields: [accountCreditCards.accountId],
+      references: [accounts.id],
+    }),
+    creditCard: one(creditCards, {
+      fields: [accountCreditCards.creditCardId],
+      references: [creditCards.id],
     }),
   })
 );
