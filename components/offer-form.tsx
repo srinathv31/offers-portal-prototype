@@ -75,7 +75,11 @@ export function OfferForm({
   const [basePoints, setBasePoints] = useState<string>(
     initialValues?.parameters?.basePoints?.toString() || "1"
   );
-  const [pmCategory, setPmCategory] = useState(initialValues?.parameters?.category || "");
+  const [pmCategory, setPmCategory] = useState(
+    (typeof initialValues?.parameters?.category === "string" 
+      ? initialValues.parameters.category 
+      : "") || ""
+  );
   const [pmMinPurchase, setPmMinPurchase] = useState<string>(
     initialValues?.parameters?.minPurchase?.toString() || ""
   );
@@ -88,7 +92,9 @@ export function OfferForm({
     initialValues?.parameters?.maxCashback?.toString() || ""
   );
   const [daysOfWeek, setDaysOfWeek] = useState<string[]>(
-    initialValues?.parameters?.daysOfWeek || []
+    (Array.isArray(initialValues?.parameters?.daysOfWeek) 
+      ? initialValues.parameters.daysOfWeek as string[]
+      : []) || []
   );
 
   // Parameters for DISCOUNT
@@ -109,7 +115,11 @@ export function OfferForm({
   const [minSpend, setMinSpend] = useState<string>(
     initialValues?.parameters?.minSpend?.toString() || ""
   );
-  const [timeframe, setTimeframe] = useState(initialValues?.parameters?.timeframe || "");
+  const [timeframe, setTimeframe] = useState(
+    (typeof initialValues?.parameters?.timeframe === "string" 
+      ? initialValues.parameters.timeframe 
+      : "") || ""
+  );
 
   // Progress tracking fields
   const [targetAmount, setTargetAmount] = useState<string>(

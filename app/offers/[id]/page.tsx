@@ -108,7 +108,7 @@ async function OfferDetailContent({ id }: { id: string }) {
                           : "No"
                         : Array.isArray(value)
                         ? value.join(", ")
-                        : value}
+                        : String(value ?? "")}
                     </dd>
                   </div>
                 ))}

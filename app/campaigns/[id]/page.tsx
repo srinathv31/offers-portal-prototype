@@ -16,7 +16,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, PlayCircle, Rocket, Calendar, User, Users, Target } from "lucide-react";
+import {
+  ArrowLeft,
+  PlayCircle,
+  Rocket,
+  Calendar,
+  User,
+  Users,
+  Target,
+} from "lucide-react";
 import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +45,9 @@ async function CampaignDetailContent({ id }: { id: string }) {
 
   const offers = campaign.campaignOffers.map((co) => co.offer);
   const segments = campaign.campaignSegments.map((cs) => cs.segment);
-  const rules = campaign.campaignEligibilityRules.map((cr) => cr.eligibilityRule);
+  const rules = campaign.campaignEligibilityRules.map(
+    (cr) => cr.eligibilityRule
+  );
   const metrics = campaign.metrics as {
     activations?: number;
     revenue?: number;
@@ -60,17 +70,24 @@ async function CampaignDetailContent({ id }: { id: string }) {
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold tracking-tight">{campaign.name}</h1>
+                <h1 className="text-4xl font-bold tracking-tight">
+                  {campaign.name}
+                </h1>
                 <StatusBadge status={campaign.status} />
               </div>
-              <p className="text-muted-foreground text-lg">{campaign.purpose}</p>
+              <p className="text-muted-foreground text-lg">
+                {campaign.purpose}
+              </p>
               {campaign.startDate && campaign.endDate && (
                 <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
@@ -82,14 +99,20 @@ async function CampaignDetailContent({ id }: { id: string }) {
               )}
             </div>
             <div className="flex gap-2">
-              <form action={`/api/simulate?campaignId=${campaign.id}`} method="POST">
+              <form
+                action={`/api/simulate?campaignId=${campaign.id}`}
+                method="POST"
+              >
                 <Button variant="outline" className="gap-2" type="submit">
                   <PlayCircle className="h-4 w-4" />
                   Run E2E Test
                 </Button>
               </form>
               {campaign.status === "IN_REVIEW" && (
-                <form action={`/api/campaigns/${campaign.id}/publish`} method="POST">
+                <form
+                  action={`/api/campaigns/${campaign.id}/publish`}
+                  method="POST"
+                >
                   <Button className="gap-2">
                     <Rocket className="h-4 w-4" />
                     Publish
@@ -169,30 +192,43 @@ async function CampaignDetailContent({ id }: { id: string }) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Purpose</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Purpose
+                  </label>
                   <p className="mt-1">{campaign.purpose}</p>
                 </div>
-                {campaign.ownerIds && (campaign.ownerIds as string[]).length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Owners</label>
-                    <div className="flex items-center gap-2 mt-2">
-                      {(campaign.ownerIds as string[]).map((owner) => (
-                        <Badge key={owner} variant="secondary" className="gap-1">
-                          <User className="h-3 w-3" />
-                          {owner}
-                        </Badge>
-                      ))}
+                {campaign.ownerIds &&
+                  (campaign.ownerIds as string[]).length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Owners
+                      </label>
+                      <div className="flex items-center gap-2 mt-2">
+                        {(campaign.ownerIds as string[]).map((owner) => (
+                          <Badge
+                            key={owner}
+                            variant="secondary"
+                            className="gap-1"
+                          >
+                            <User className="h-3 w-3" />
+                            {owner}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
                 <Separator />
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Offers</label>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Offers
+                    </label>
                     <p className="mt-1 text-2xl font-bold">{offers.length}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Segments</label>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Segments
+                    </label>
                     <p className="mt-1 text-2xl font-bold">{segments.length}</p>
                   </div>
                 </div>
@@ -206,19 +242,27 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Channels</label>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Channels
+                    </label>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {((campaign.channelPlan.channels as string[]) || []).map((channel) => (
-                        <Badge key={channel} variant="outline">
-                          {channel}
-                        </Badge>
-                      ))}
+                      {((campaign.channelPlan.channels as string[]) || []).map(
+                        (channel) => (
+                          <Badge key={channel} variant="outline">
+                            {channel}
+                          </Badge>
+                        )
+                      )}
                     </div>
                   </div>
                   {campaign.channelPlan.dynamicTnc && (
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">Terms & Conditions</label>
-                      <p className="mt-1 text-sm">{campaign.channelPlan.dynamicTnc}</p>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Terms & Conditions
+                      </label>
+                      <p className="mt-1 text-sm">
+                        {campaign.channelPlan.dynamicTnc}
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -244,7 +288,9 @@ async function CampaignDetailContent({ id }: { id: string }) {
                     />
                   ))
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No offers added yet</p>
+                  <p className="text-muted-foreground text-center py-8">
+                    No offers added yet
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -264,7 +310,9 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-5">
                     <div className="text-center p-3 rounded-lg bg-muted/50">
-                      <p className="text-2xl font-bold">{enrollmentStats.total}</p>
+                      <p className="text-2xl font-bold">
+                        {enrollmentStats.total}
+                      </p>
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
@@ -277,7 +325,9 @@ async function CampaignDetailContent({ id }: { id: string }) {
                       <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                         {enrollmentStats.inProgress}
                       </p>
-                      <p className="text-xs text-muted-foreground">In Progress</p>
+                      <p className="text-xs text-muted-foreground">
+                        In Progress
+                      </p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
                       <p className="text-2xl font-bold text-green-600 dark:text-green-400">
@@ -289,7 +339,9 @@ async function CampaignDetailContent({ id }: { id: string }) {
                       <p className="text-2xl font-bold text-slate-600 dark:text-slate-400">
                         {enrollmentStats.expired + enrollmentStats.optedOut}
                       </p>
-                      <p className="text-xs text-muted-foreground">Expired/Opted Out</p>
+                      <p className="text-xs text-muted-foreground">
+                        Expired/Opted Out
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -322,10 +374,17 @@ async function CampaignDetailContent({ id }: { id: string }) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium">
-                                  {enrollment.account.firstName} {enrollment.account.lastName}
+                                  {enrollment.account.firstName}{" "}
+                                  {enrollment.account.lastName}
                                 </span>
-                                <AccountTierBadge tier={enrollment.account.tier} showIcon={false} />
-                                <EnrollmentStatusBadge status={enrollment.status} showIcon={false} />
+                                <AccountTierBadge
+                                  tier={enrollment.account.tier}
+                                  showIcon={false}
+                                />
+                                <EnrollmentStatusBadge
+                                  status={enrollment.status}
+                                  showIcon={false}
+                                />
                               </div>
                               <p className="text-sm text-muted-foreground mt-1">
                                 {enrollment.offer.name}
@@ -333,22 +392,37 @@ async function CampaignDetailContent({ id }: { id: string }) {
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            {enrollment.targetAmount != null && enrollment.targetAmount > 0 && (
-                              <div className="w-32">
-                                <div className="flex items-center justify-between text-xs mb-1">
-                                  <span className="text-muted-foreground">Progress</span>
-                                  <span className="font-medium">
-                                    {parseFloat(String(enrollment.progressPct)).toFixed(0)}%
-                                  </span>
+                            {enrollment.targetAmount != null &&
+                              enrollment.targetAmount > 0 && (
+                                <div className="w-32">
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <span className="text-muted-foreground">
+                                      Progress
+                                    </span>
+                                    <span className="font-medium">
+                                      {parseFloat(
+                                        String(enrollment.progressPct)
+                                      ).toFixed(0)}
+                                      %
+                                    </span>
+                                  </div>
+                                  <Progress
+                                    value={Math.min(
+                                      parseFloat(
+                                        String(enrollment.progressPct)
+                                      ),
+                                      100
+                                    )}
+                                    className="h-1.5"
+                                  />
                                 </div>
-                                <Progress 
-                                  value={Math.min(parseFloat(String(enrollment.progressPct)), 100)} 
-                                  className="h-1.5" 
-                                />
-                              </div>
-                            )}
+                              )}
                             <p className="text-xs text-muted-foreground mt-1">
-                              Enrolled {format(new Date(enrollment.enrolledAt), "MMM d, yyyy")}
+                              Enrolled{" "}
+                              {format(
+                                new Date(enrollment.enrolledAt),
+                                "MMM d, yyyy"
+                              )}
                             </p>
                           </div>
                         </div>
@@ -387,13 +461,21 @@ async function CampaignDetailContent({ id }: { id: string }) {
                       {segment.definitionJson && (
                         <p className="text-sm text-muted-foreground mt-2">
                           Est. Size:{" "}
-                          {((segment.definitionJson as { estimatedSize?: number })?.estimatedSize || 0).toLocaleString()}
+                          {(
+                            (
+                              segment.definitionJson as {
+                                estimatedSize?: number;
+                              }
+                            )?.estimatedSize || 0
+                          ).toLocaleString()}
                         </p>
                       )}
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No segments defined yet</p>
+                  <p className="text-muted-foreground text-center py-8">
+                    No segments defined yet
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -405,17 +487,25 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {rules.map((rule) => (
-                    <div key={rule.id} className="p-4 rounded-lg border bg-muted/50">
+                    <div
+                      key={rule.id}
+                      className="p-4 rounded-lg border bg-muted/50"
+                    >
                       <code className="text-sm">{rule.dsl}</code>
-                      {rule.dataDependencies && (rule.dataDependencies as string[]).length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {(rule.dataDependencies as string[]).map((dep) => (
-                            <Badge key={dep} variant="secondary" className="text-xs">
-                              {dep}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                      {rule.dataDependencies &&
+                        (rule.dataDependencies as string[]).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(rule.dataDependencies as string[]).map((dep) => (
+                              <Badge
+                                key={dep}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {dep}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   ))}
                 </CardContent>
@@ -432,7 +522,13 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent>
                   <ControlChecklistView
-                    items={(campaign.controlChecklist.items as Array<{ id: string; label: string; checked: boolean }>) || []}
+                    items={
+                      (campaign.controlChecklist.items as Array<{
+                        name: string;
+                        result: "PASS" | "WARN" | "FAIL";
+                        evidence_ref?: string;
+                      }>) || []
+                    }
                   />
                 </CardContent>
               </Card>
@@ -479,4 +575,3 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     </Suspense>
   );
 }
-

@@ -68,26 +68,26 @@ export function OfferCard({
       <CardContent>
         <div className="space-y-2">
           {/* Display key parameters */}
-          {type === "POINTS_MULTIPLIER" && parameters.multiplier && (
+          {type === "POINTS_MULTIPLIER" && parameters.multiplier != null && (
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{parameters.multiplier}×</span> points
-              {parameters.category && ` on ${parameters.category}`}
+              <span className="font-medium text-foreground">{String(parameters.multiplier)}×</span> points
+              {parameters.category != null && ` on ${String(parameters.category)}`}
             </p>
           )}
-          {type === "CASHBACK" && parameters.cashbackPercent && (
+          {type === "CASHBACK" && parameters.cashbackPercent != null && (
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{parameters.cashbackPercent}%</span> cashback
-              {parameters.maxCashback && ` (max $${parameters.maxCashback})`}
+              <span className="font-medium text-foreground">{String(parameters.cashbackPercent)}%</span> cashback
+              {parameters.maxCashback != null && ` (max $${String(parameters.maxCashback)})`}
             </p>
           )}
-          {type === "DISCOUNT" && parameters.discountPercent && (
+          {type === "DISCOUNT" && parameters.discountPercent != null && (
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{parameters.discountPercent}%</span> discount
+              <span className="font-medium text-foreground">{String(parameters.discountPercent)}%</span> discount
             </p>
           )}
-          {type === "BONUS" && parameters.bonusPoints && (
+          {type === "BONUS" && parameters.bonusPoints != null && (
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{parameters.bonusPoints}</span> bonus points
+              <span className="font-medium text-foreground">{String(parameters.bonusPoints)}</span> bonus points
             </p>
           )}
 

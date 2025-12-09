@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getOfferWithCampaigns } from "@/lib/db";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditOfferClient } from "./edit-client";
+import type { OfferType } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ async function EditOfferContent({ id }: { id: string }) {
   // Prepare initial values for the form
   const initialValues = {
     name: offer.name,
-    type: offer.type,
+    type: offer.type as OfferType,
     vendor: offer.vendor || "",
     parameters: (offer.parameters || {}) as Record<string, unknown>,
     hasProgressTracking: offer.hasProgressTracking,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOfferWithCampaigns, updateOffer } from "@/lib/db";
+import type { OfferType } from "@/lib/db/schema";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -70,7 +71,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const updateData: {
       name?: string;
-      type?: string;
+      type?: OfferType;
       vendor?: string | null;
       parameters?: Record<string, unknown>;
       hasProgressTracking?: boolean;
@@ -84,7 +85,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       effectiveTo?: Date | null;
     } = {};
     if (name !== undefined) updateData.name = name;
-    if (type !== undefined) updateData.type = type;
+    if (type !== undefined) {
+      const validTypes: OfferType[] = ["POINTS_MULTIPLIER", "CASHBACK", "DISCOUNT", "BONUS"];
+      if (validTypes.includes(type as OfferType)) {
+        updateData.type = type as OfferType;
+      }
+    }
     if (vendor !== undefined) updateData.vendor = vendor || null;
     if (parameters !== undefined) updateData.parameters = parameters;
     if (hasProgressTracking !== undefined)

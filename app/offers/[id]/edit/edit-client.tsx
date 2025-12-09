@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import type { OfferType } from "@/lib/db/schema";
 
 interface Campaign {
   id: string;
@@ -20,7 +21,7 @@ interface EditOfferClientProps {
   offerId: string;
   initialValues: {
     name: string;
-    type: string;
+    type: OfferType;
     vendor: string;
     parameters: Record<string, unknown>;
     hasProgressTracking: boolean;
