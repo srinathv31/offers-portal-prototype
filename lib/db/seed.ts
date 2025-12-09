@@ -971,8 +971,10 @@ async function seed() {
       const lastUsed = new Date();
       lastUsed.setDate(lastUsed.getDate() - Math.floor(Math.random() * 30)); // Last 30 days
       
-      // Assign preferred categories
-      const categories = ["Dining", "Travel", "Groceries", "Gas", "Shopping", null];
+      // Assign preferred categories for secondary cards
+      // These should match actual transaction categories for smart card selection
+      const categories = ["Dining", "Travel", "Groceries", "Online Shopping", null];
+      // Secondary cards (j === 1) get preferences; primary cards (j === 0) don't
       const preferredCategory = j === 1 ? categories[Math.floor(Math.random() * categories.length)] : null;
       
       accountCreditCardsData.push({
@@ -1687,16 +1689,60 @@ async function seed() {
   // Create sample transactions
   console.log("Creating account transactions...");
 
-  // Create mapping of account ID to primary credit card ID for transactions
-  const accountToPrimaryCreditCard = new Map<string, string>();
-  let creditCardIndex = 0;
-  for (let i = 0; i < createdAccounts.length; i++) {
-    const account = createdAccounts[i];
-    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
-    // First card is always primary
-    accountToPrimaryCreditCard.set(account.id, createdCreditCards[creditCardIndex].id);
-    creditCardIndex += numCards;
+  // Create sophisticated mapping of accounts to their credit cards
+  interface CardInfo {
+    cardId: string;
+    isPrimary: boolean;
+    preferredCategory: string | null;
   }
+  
+  const accountToCards = new Map<string, CardInfo[]>();
+  
+  // Build the mapping from accountCreditCardsData
+  for (const accCard of accountCreditCardsData) {
+    const cards = accountToCards.get(accCard.accountId) || [];
+    cards.push({
+      cardId: accCard.creditCardId,
+      isPrimary: accCard.isPrimary,
+      preferredCategory: accCard.preferredForCategory,
+    });
+    accountToCards.set(accCard.accountId, cards);
+  }
+  
+  // Helper function to select the best card for a transaction
+  const selectCardForTransaction = (accountId: string, category: string): string => {
+    const cards = accountToCards.get(accountId);
+    if (!cards || cards.length === 0) {
+      throw new Error(`No cards found for account ${accountId}`);
+    }
+    
+    // If account has multiple cards, check for category preference
+    if (cards.length > 1) {
+      // Normalize category names for matching
+      const normalizeCategory = (cat: string) => cat.toLowerCase().replace(/\s+/g, '');
+      const normalizedTxCategory = normalizeCategory(category);
+      
+      // Look for a card with matching preferred category
+      const preferredCard = cards.find(
+        c => c.preferredCategory && normalizeCategory(c.preferredCategory).includes(normalizedTxCategory.split(/[,&]/)[0])
+      );
+      
+      if (preferredCard) {
+        return preferredCard.cardId;
+      }
+      
+      // Otherwise, 70% primary card, 30% secondary card
+      const usePrimary = Math.random() < 0.7;
+      const selectedCard = usePrimary 
+        ? cards.find(c => c.isPrimary) 
+        : cards.find(c => !c.isPrimary);
+      
+      return (selectedCard || cards[0]).cardId;
+    }
+    
+    // Single card account - use that card
+    return cards[0].cardId;
+  };
 
   const transactionsData = [
     // Victoria's Amazon transactions (enrollment 0 - completed)
@@ -2098,10 +2144,10 @@ async function seed() {
     },
   ];
 
-  // Add credit card IDs to transactions
+  // Add credit card IDs to transactions using intelligent card selection
   const transactionsWithCards = transactionsData.map((tx) => ({
     ...tx,
-    creditCardId: accountToPrimaryCreditCard.get(tx.accountId),
+    creditCardId: selectCardForTransaction(tx.accountId, tx.category),
   }));
 
   await db.insert(schema.accountTransactions).values(transactionsWithCards);
