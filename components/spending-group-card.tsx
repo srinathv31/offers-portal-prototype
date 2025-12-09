@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AccountTierBadge } from "@/components/account-tier-badge";
+import { SpendingGroupAccountsDialog } from "@/components/spending-group-accounts-dialog";
 import type { AccountTier } from "@/lib/db/schema";
 import { Users, DollarSign, ChevronDown, ChevronUp, Link as LinkIcon } from "lucide-react";
 
@@ -46,7 +47,6 @@ function formatCurrency(cents: number): string {
 }
 
 export function SpendingGroupCard({
-  id,
   name,
   description,
   accountCount,
@@ -124,9 +124,23 @@ export function SpendingGroupCard({
         {/* Expanded Account List */}
         {isExpanded && displayedAccounts.length > 0 && (
           <div className="pt-3 border-t">
-            <p className="text-xs font-medium text-muted-foreground mb-3">
-              Member Accounts
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Member Accounts
+              </p>
+              {accounts.length > 0 && (
+                <SpendingGroupAccountsDialog
+                  groupName={name}
+                  accounts={accounts}
+                  trigger={
+                    <Button variant="outline" size="sm" className="h-7 text-xs">
+                      <Users className="h-3 w-3 mr-1" />
+                      View All ({accounts.length})
+                    </Button>
+                  }
+                />
+              )}
+            </div>
             <div className="space-y-2">
               {displayedAccounts.map((account) => (
                 <Link

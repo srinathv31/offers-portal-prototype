@@ -11,7 +11,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, CreditCard } from "lucide-react";
+import type { CreditCardProduct } from "@/lib/db/schema";
+
+interface CreditCardInfo {
+  id: string;
+  creditCardProduct: CreditCardProduct;
+  lastFourDigits: string;
+}
 
 interface Transaction {
   id: string;
@@ -20,12 +27,14 @@ interface Transaction {
   category: string;
   amount: number; // in cents
   qualifiesForOffer: boolean;
+  creditCard?: CreditCardInfo | null;
 }
 
 interface TransactionTableProps {
   transactions: Transaction[];
   className?: string;
   showQualified?: boolean;
+  showCreditCard?: boolean;
 }
 
 function formatCurrency(cents: number): string {
@@ -52,10 +61,28 @@ function getCategoryColor(category: string): string {
   return categoryColors[category] || categoryColors.Other;
 }
 
+// Credit card product branded colors
+const creditCardProductColors: Record<CreditCardProduct, string> = {
+  FLEXPAY: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+  DOUBLE_UP: "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
+  CASH_CREDIT: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+  FIRST_CLASS: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+  CLEAR: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
+};
+
+const creditCardProductNames: Record<CreditCardProduct, string> = {
+  FLEXPAY: "FlexPay",
+  DOUBLE_UP: "Double Up",
+  CASH_CREDIT: "Cash Credit",
+  FIRST_CLASS: "First Class",
+  CLEAR: "Clear",
+};
+
 export function TransactionTable({
   transactions,
   className,
   showQualified = true,
+  showCreditCard = false,
 }: TransactionTableProps) {
   if (transactions.length === 0) {
     return (
@@ -73,6 +100,7 @@ export function TransactionTable({
             <TableHead>Date</TableHead>
             <TableHead>Merchant</TableHead>
             <TableHead>Category</TableHead>
+            {showCreditCard && <TableHead>Card</TableHead>}
             <TableHead className="text-right">Amount</TableHead>
             {showQualified && <TableHead className="text-center">Qualified</TableHead>}
           </TableRow>
@@ -92,6 +120,29 @@ export function TransactionTable({
                   {tx.category}
                 </Badge>
               </TableCell>
+              {showCreditCard && (
+                <TableCell>
+                  {tx.creditCard ? (
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-xs",
+                          creditCardProductColors[tx.creditCard.creditCardProduct]
+                        )}
+                      >
+                        <CreditCard className="h-3 w-3 mr-1" />
+                        {creditCardProductNames[tx.creditCard.creditCardProduct]}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        •{tx.creditCard.lastFourDigits}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className="text-right font-mono">
                 {formatCurrency(tx.amount)}
               </TableCell>

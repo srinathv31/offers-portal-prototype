@@ -13,7 +13,7 @@ import type { StrategySuggestion } from "@/lib/ai/types";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, purpose, suggestion, startDate, endDate, channels } = body;
+    const { name, purpose, suggestion, startDate, endDate, channels, offerIds } = body;
 
     if (!name || !purpose) {
       return NextResponse.json(
@@ -74,6 +74,19 @@ export async function POST(request: NextRequest) {
     // If AI suggestion provided, create offers and segments
     if (suggestion) {
       await persistAISuggestion(campaign.id, suggestion);
+    }
+
+    // If user selected existing offers, link them to the campaign
+    if (offerIds && Array.isArray(offerIds) && offerIds.length > 0) {
+      await db.insert(campaignOffers).values(
+        offerIds.map((offerId: string) => ({
+          campaignId: campaign.id,
+          offerId,
+        }))
+      );
+      console.log(
+        `[Create Campaign] Linked ${offerIds.length} existing offers to campaign ${campaign.id}`
+      );
     }
 
     return NextResponse.json({

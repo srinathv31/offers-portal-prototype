@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ExternalLink, TrendingUp } from "lucide-react";
+import { ArrowLeft, ExternalLink, TrendingUp, Pencil, Target } from "lucide-react";
 import { format } from "date-fns";
 import type { OfferType } from "@/lib/db/schema";
 
@@ -39,7 +39,7 @@ async function OfferDetailContent({ id }: { id: string }) {
   }
 
   const campaigns = offer.campaignOffers.map((co) => co.campaign);
-  const parameters = (offer.parameters || {}) as Record<string, any>;
+  const parameters = (offer.parameters || {}) as Record<string, unknown>;
 
   // Find most recent completed campaign for performance data
   const liveCampaigns = campaigns.filter((c) => c.status === "LIVE");
@@ -51,13 +51,21 @@ async function OfferDetailContent({ id }: { id: string }) {
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link
+              href="/offers"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Offers
+            </Link>
+            <Link href={`/offers/${id}/edit`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Pencil className="h-4 w-4" />
+                Edit Offer
+              </Button>
+            </Link>
+          </div>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -100,7 +108,7 @@ async function OfferDetailContent({ id }: { id: string }) {
                           : "No"
                         : Array.isArray(value)
                         ? value.join(", ")
-                        : value}
+                        : String(value ?? "")}
                     </dd>
                   </div>
                 ))}
@@ -112,6 +120,54 @@ async function OfferDetailContent({ id }: { id: string }) {
             )}
           </CardContent>
         </Card>
+
+        {/* Progress Tracking */}
+        {offer.hasProgressTracking && offer.progressTarget && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Progress Tracking</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                {offer.progressTarget.targetAmount && (
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Target Amount</dt>
+                    <dd className="text-lg font-semibold">
+                      ${(offer.progressTarget.targetAmount / 100).toLocaleString()}
+                    </dd>
+                  </div>
+                )}
+                {offer.progressTarget.timeframeDays && (
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Timeframe</dt>
+                    <dd className="text-lg font-semibold">
+                      {offer.progressTarget.timeframeDays} days
+                    </dd>
+                  </div>
+                )}
+                {offer.progressTarget.category && (
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Category</dt>
+                    <dd className="text-lg font-semibold">
+                      {offer.progressTarget.category}
+                    </dd>
+                  </div>
+                )}
+                {offer.progressTarget.vendor && (
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Vendor</dt>
+                    <dd className="text-lg font-semibold">
+                      {offer.progressTarget.vendor}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Last Campaign Performance */}
         {lastCampaign && (
@@ -138,19 +194,19 @@ async function OfferDetailContent({ id }: { id: string }) {
                 <div>
                   <p className="text-sm text-muted-foreground">Revenue</p>
                   <p className="text-2xl font-bold">
-                    ${((lastCampaign.metrics as any)?.revenue || 0).toLocaleString()}
+                    ${((lastCampaign.metrics as { revenue?: number })?.revenue || 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Activations</p>
                   <p className="text-2xl font-bold">
-                    {((lastCampaign.metrics as any)?.activations || 0).toLocaleString()}
+                    {((lastCampaign.metrics as { activations?: number })?.activations || 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Error Rate</p>
                   <p className="text-2xl font-bold">
-                    {((lastCampaign.metrics as any)?.error_rate_pct || 0).toFixed(2)}%
+                    {((lastCampaign.metrics as { error_rate_pct?: number })?.error_rate_pct || 0).toFixed(2)}%
                   </p>
                 </div>
               </div>

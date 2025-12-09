@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+import { eq } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
 
@@ -60,6 +61,65 @@ export async function getOfferWithCampaigns(offerId: string) {
   });
 
   return offer;
+}
+
+export interface OfferFilters {
+  type?: schema.OfferType;
+  vendor?: string;
+  search?: string;
+}
+
+export async function getAllOffers(filters?: OfferFilters) {
+  const allOffers = await db.query.offers.findMany({
+    with: {
+      campaignOffers: {
+        with: {
+          campaign: true,
+        },
+      },
+    },
+    orderBy: (offers, { desc }) => [desc(offers.createdAt)],
+  });
+
+  // Apply filters in-memory (for simplicity in POC)
+  let filtered = allOffers;
+
+  if (filters?.type) {
+    filtered = filtered.filter((o) => o.type === filters.type);
+  }
+
+  if (filters?.vendor) {
+    filtered = filtered.filter(
+      (o) => o.vendor?.toLowerCase() === filters.vendor?.toLowerCase()
+    );
+  }
+
+  if (filters?.search) {
+    const search = filters.search.toLowerCase();
+    filtered = filtered.filter(
+      (o) =>
+        o.name.toLowerCase().includes(search) ||
+        o.vendor?.toLowerCase().includes(search)
+    );
+  }
+
+  return filtered;
+}
+
+export async function updateOffer(
+  offerId: string,
+  data: Partial<typeof schema.offers.$inferInsert>
+) {
+  const [updatedOffer] = await db
+    .update(schema.offers)
+    .set({
+      ...data,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.offers.id, offerId))
+    .returning();
+
+  return updatedOffer;
 }
 
 export async function getCampaignsByStatus(status: schema.CampaignStatus) {
@@ -175,8 +235,16 @@ export async function getAccountWithDetails(accountId: string) {
         orderBy: (enrollments, { desc }) => [desc(enrollments.enrolledAt)],
       },
       accountTransactions: {
+        with: {
+          creditCard: true,
+        },
         orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
         limit: 100,
+      },
+      accountCreditCards: {
+        with: {
+          creditCard: true,
+        },
       },
       spendingGroupAccounts: {
         with: {
@@ -285,4 +353,37 @@ export async function getEnrollmentWithTransactions(enrollmentId: string) {
   });
 
   return enrollment;
+}
+
+// ==========================================
+// TRANSACTION HELPERS
+// ==========================================
+
+export interface TransactionFilters {
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export async function getAccountTransactions(
+  accountId: string,
+  filters?: TransactionFilters
+) {
+  const transactions = await db.query.accountTransactions.findMany({
+    where: (tx, { eq, and, gte, lte }) => {
+      const conditions = [eq(tx.accountId, accountId)];
+      if (filters?.startDate) {
+        conditions.push(gte(tx.transactionDate, filters.startDate));
+      }
+      if (filters?.endDate) {
+        conditions.push(lte(tx.transactionDate, filters.endDate));
+      }
+      return and(...conditions);
+    },
+    with: {
+      creditCard: true,
+    },
+    orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+  });
+
+  return transactions;
 }

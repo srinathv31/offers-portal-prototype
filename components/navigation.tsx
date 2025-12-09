@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +38,17 @@ export function Navigation() {
                 )}
               >
                 Accounts
+              </Link>
+              <Link
+                href="/offers"
+                className={cn(
+                  "px-3 py-2 text-sm font-medium transition-colors hover:text-foreground",
+                  pathname.startsWith("/offers") || pathname === "/create-offer"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                Offers
               </Link>
               <Link
                 href="/spending-groups"
