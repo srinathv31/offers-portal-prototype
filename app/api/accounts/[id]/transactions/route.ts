@@ -36,6 +36,14 @@ export async function GET(
       category: tx.category,
       amount: tx.amount,
       qualifiesForOffer: tx.qualifiesForOffer,
+      metadata: tx.metadata,
+      enrollment: tx.enrollment
+        ? {
+            offerName: tx.enrollment.offer.name,
+            offerType: tx.enrollment.offer.type,
+            campaignName: tx.enrollment.campaign?.name ?? null,
+          }
+        : null,
       creditCard: tx.creditCard
         ? {
             id: tx.creditCard.id,
@@ -54,4 +62,3 @@ export async function GET(
     );
   }
 }
-

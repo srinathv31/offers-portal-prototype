@@ -16,6 +16,20 @@ interface CreditCardInfo {
   lastFourDigits: string;
 }
 
+interface QualificationDetails {
+  qualified: boolean;
+  offerName?: string;
+  campaignName?: string;
+  reason: string;
+  details?: Record<string, unknown>;
+}
+
+interface EnrollmentInfo {
+  offerName: string;
+  offerType: string;
+  campaignName?: string | null;
+}
+
 interface Transaction {
   id: string;
   transactionDate: string;
@@ -23,6 +37,10 @@ interface Transaction {
   category: string;
   amount: number;
   qualifiesForOffer: boolean;
+  metadata?: {
+    qualification?: QualificationDetails;
+  };
+  enrollment?: EnrollmentInfo | null;
   creditCard: CreditCardInfo | null;
 }
 
@@ -180,6 +198,8 @@ export function AccountTransactionsTab({
                 category: tx.category,
                 amount: tx.amount,
                 qualifiesForOffer: tx.qualifiesForOffer,
+                metadata: tx.metadata,
+                enrollment: tx.enrollment,
                 creditCard: tx.creditCard,
               }))}
               showQualified={true}
@@ -210,4 +230,3 @@ export function AccountTransactionsTab({
     </Card>
   );
 }
-

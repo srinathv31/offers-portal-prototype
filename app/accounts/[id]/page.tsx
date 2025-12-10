@@ -51,9 +51,8 @@ async function AccountDetailContent({ id }: { id: string }) {
 
   const enrollments = account.accountOfferEnrollments || [];
   const transactions = account.accountTransactions || [];
-  const spendingGroups = account.spendingGroupAccounts?.map(
-    (sga) => sga.spendingGroup
-  ) || [];
+  const spendingGroups =
+    account.spendingGroupAccounts?.map((sga) => sga.spendingGroup) || [];
   const creditCards = account.accountCreditCards || [];
 
   // Group enrollments by status
@@ -295,6 +294,14 @@ async function AccountDetailContent({ id }: { id: string }) {
                 category: tx.category,
                 amount: tx.amount,
                 qualifiesForOffer: tx.qualifiesForOffer,
+                metadata: tx.metadata,
+                enrollment: tx.enrollment
+                  ? {
+                      offerName: tx.enrollment.offer.name,
+                      offerType: tx.enrollment.offer.type,
+                      campaignName: tx.enrollment.campaign?.name ?? null,
+                    }
+                  : null,
                 creditCard: tx.creditCard
                   ? {
                       id: tx.creditCard.id,
@@ -342,9 +349,11 @@ async function AccountDetailContent({ id }: { id: string }) {
                               product={card.creditCardProduct}
                             />
                             <p className="text-xs text-muted-foreground">
-                              {creditCardProductDescriptions[
-                                card.creditCardProduct
-                              ]}
+                              {
+                                creditCardProductDescriptions[
+                                  card.creditCardProduct
+                                ]
+                              }
                             </p>
                           </div>
 
@@ -386,10 +395,7 @@ async function AccountDetailContent({ id }: { id: string }) {
                               <Clock className="h-4 w-4" />
                               <span>
                                 Expires{" "}
-                                {format(
-                                  new Date(card.expirationDate),
-                                  "MM/yy"
-                                )}
+                                {format(new Date(card.expirationDate), "MM/yy")}
                               </span>
                             </div>
                           </div>
@@ -540,4 +546,3 @@ export default async function AccountDetailPage({ params }: PageProps) {
     </Suspense>
   );
 }
-

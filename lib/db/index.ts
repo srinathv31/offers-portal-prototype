@@ -237,6 +237,12 @@ export async function getAccountWithDetails(accountId: string) {
       accountTransactions: {
         with: {
           creditCard: true,
+          enrollment: {
+            with: {
+              offer: true,
+              campaign: true,
+            },
+          },
         },
         orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
         limit: 100,
@@ -381,6 +387,12 @@ export async function getAccountTransactions(
     },
     with: {
       creditCard: true,
+      enrollment: {
+        with: {
+          offer: true,
+          campaign: true,
+        },
+      },
     },
     orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
   });
