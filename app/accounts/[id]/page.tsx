@@ -6,6 +6,7 @@ import { AccountTierBadge } from "@/components/account-tier-badge";
 import { AccountStatusBadge } from "@/components/account-status-badge";
 import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
 import { AccountTransactionsTab } from "@/components/account-transactions-tab";
+import { PersonalizedOffersTab } from "@/components/personalized-offers-tab";
 import { CreditCardProductBadge } from "@/components/credit-card-product-badge";
 import { creditCardProductDescriptions } from "@/lib/credit-card-utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
   Star,
   Clock,
   Activity,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -171,11 +173,15 @@ async function AccountDetailContent({ id }: { id: string }) {
       {/* Content Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="enrollments" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="personalized" className="gap-1">
+              <Sparkles className="h-3.5 w-3.5" />
+              Personalized
+            </TabsTrigger>
             <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
-            <TabsTrigger value="groups">Spending Groups</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
           </TabsList>
 
           {/* Enrollments Tab */}
@@ -294,7 +300,7 @@ async function AccountDetailContent({ id }: { id: string }) {
                 category: tx.category,
                 amount: tx.amount,
                 qualifiesForOffer: tx.qualifiesForOffer,
-                metadata: tx.metadata,
+                metadata: tx.metadata ?? undefined,
                 enrollment: tx.enrollment
                   ? {
                       offerName: tx.enrollment.offer.name,
@@ -310,6 +316,15 @@ async function AccountDetailContent({ id }: { id: string }) {
                     }
                   : null,
               }))}
+            />
+          </TabsContent>
+
+          {/* Personalized Offers Tab */}
+          <TabsContent value="personalized">
+            <PersonalizedOffersTab
+              accountId={account.id}
+              firstName={account.firstName}
+              tier={account.tier}
             />
           </TabsContent>
 
