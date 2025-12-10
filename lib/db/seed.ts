@@ -900,10 +900,10 @@ async function seed() {
 
   // Create credit cards
   console.log("Creating credit cards...");
-  
+
   // Helper function to generate realistic card numbers
   const generateCardNumber = (lastFour: string) => `**** **** **** ${lastFour}`;
-  
+
   // Credit card products for each tier
   const tierProducts = {
     DIAMOND: ["FIRST_CLASS", "DOUBLE_UP", "CASH_CREDIT"],
@@ -919,24 +919,34 @@ async function seed() {
   for (let i = 0; i < createdAccounts.length; i++) {
     const account = createdAccounts[i];
     const products = tierProducts[account.tier as keyof typeof tierProducts];
-    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
-    
+    const numCards =
+      account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
+
     for (let cardIndex = 0; cardIndex < numCards; cardIndex++) {
       const product = products[cardIndex % products.length];
-      const lastFour = String(1000 + (i * 10) + cardIndex).padStart(4, "0");
+      const lastFour = String(1000 + i * 10 + cardIndex).padStart(4, "0");
       const openedYears = Math.floor(Math.random() * 3) + 1; // 1-3 years ago
       const openedAt = new Date();
       openedAt.setFullYear(openedAt.getFullYear() - openedYears);
-      
+
       const expirationDate = new Date();
       expirationDate.setFullYear(expirationDate.getFullYear() + 3);
-      
+
       // Credit limit based on tier and account limit
-      const cardCreditLimit = Math.floor(account.creditLimit * (cardIndex === 0 ? 0.6 : 0.4));
-      const currentBalance = Math.floor(cardCreditLimit * (Math.random() * 0.3)); // 0-30% utilization
-      
+      const cardCreditLimit = Math.floor(
+        account.creditLimit * (cardIndex === 0 ? 0.6 : 0.4)
+      );
+      const currentBalance = Math.floor(
+        cardCreditLimit * (Math.random() * 0.3)
+      ); // 0-30% utilization
+
       creditCardsData.push({
-        creditCardProduct: product as "FLEXPAY" | "DOUBLE_UP" | "CASH_CREDIT" | "FIRST_CLASS" | "CLEAR",
+        creditCardProduct: product as
+          | "FLEXPAY"
+          | "DOUBLE_UP"
+          | "CASH_CREDIT"
+          | "FIRST_CLASS"
+          | "CLEAR",
         cardNumber: generateCardNumber(lastFour),
         lastFourDigits: lastFour,
         creditLimit: cardCreditLimit,
@@ -956,27 +966,37 @@ async function seed() {
 
   // Link credit cards to accounts
   console.log("Linking credit cards to accounts...");
-  
+
   let cardIndex = 0;
   for (let i = 0; i < createdAccounts.length; i++) {
     const account = createdAccounts[i];
-    const numCards = account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
-    
+    const numCards =
+      account.tier === "DIAMOND" || account.tier === "PLATINUM" ? 2 : 1;
+
     for (let j = 0; j < numCards; j++) {
       const creditCard = createdCreditCards[cardIndex];
       const isPrimary = j === 0; // First card is primary
-      
+
       // Simulate usage
       const usageCount = Math.floor(Math.random() * 50) + 10; // 10-60 transactions
       const lastUsed = new Date();
       lastUsed.setDate(lastUsed.getDate() - Math.floor(Math.random() * 30)); // Last 30 days
-      
+
       // Assign preferred categories for secondary cards
       // These should match actual transaction categories for smart card selection
-      const categories = ["Dining", "Travel", "Groceries", "Online Shopping", null];
+      const categories = [
+        "Dining",
+        "Travel",
+        "Groceries",
+        "Online Shopping",
+        null,
+      ];
       // Secondary cards (j === 1) get preferences; primary cards (j === 0) don't
-      const preferredCategory = j === 1 ? categories[Math.floor(Math.random() * categories.length)] : null;
-      
+      const preferredCategory =
+        j === 1
+          ? categories[Math.floor(Math.random() * categories.length)]
+          : null;
+
       accountCreditCardsData.push({
         accountId: account.id,
         creditCardId: creditCard.id,
@@ -986,13 +1006,15 @@ async function seed() {
         lastUsedAt: account.status === "ACTIVE" ? lastUsed : null,
         preferredForCategory: preferredCategory,
       });
-      
+
       cardIndex++;
     }
   }
 
   await db.insert(schema.accountCreditCards).values(accountCreditCardsData);
-  console.log(`✓ Linked ${accountCreditCardsData.length} credit cards to accounts`);
+  console.log(
+    `✓ Linked ${accountCreditCardsData.length} credit cards to accounts`
+  );
 
   // Create spending groups (5 groups)
   console.log("Creating spending groups...");
@@ -1695,9 +1717,9 @@ async function seed() {
     isPrimary: boolean;
     preferredCategory: string | null;
   }
-  
+
   const accountToCards = new Map<string, CardInfo[]>();
-  
+
   // Build the mapping from accountCreditCardsData
   for (const accCard of accountCreditCardsData) {
     const cards = accountToCards.get(accCard.accountId) || [];
@@ -1708,38 +1730,46 @@ async function seed() {
     });
     accountToCards.set(accCard.accountId, cards);
   }
-  
+
   // Helper function to select the best card for a transaction
-  const selectCardForTransaction = (accountId: string, category: string): string => {
+  const selectCardForTransaction = (
+    accountId: string,
+    category: string
+  ): string => {
     const cards = accountToCards.get(accountId);
     if (!cards || cards.length === 0) {
       throw new Error(`No cards found for account ${accountId}`);
     }
-    
+
     // If account has multiple cards, check for category preference
     if (cards.length > 1) {
       // Normalize category names for matching
-      const normalizeCategory = (cat: string) => cat.toLowerCase().replace(/\s+/g, '');
+      const normalizeCategory = (cat: string) =>
+        cat.toLowerCase().replace(/\s+/g, "");
       const normalizedTxCategory = normalizeCategory(category);
-      
+
       // Look for a card with matching preferred category
       const preferredCard = cards.find(
-        c => c.preferredCategory && normalizeCategory(c.preferredCategory).includes(normalizedTxCategory.split(/[,&]/)[0])
+        (c) =>
+          c.preferredCategory &&
+          normalizeCategory(c.preferredCategory).includes(
+            normalizedTxCategory.split(/[,&]/)[0]
+          )
       );
-      
+
       if (preferredCard) {
         return preferredCard.cardId;
       }
-      
+
       // Otherwise, 70% primary card, 30% secondary card
       const usePrimary = Math.random() < 0.7;
-      const selectedCard = usePrimary 
-        ? cards.find(c => c.isPrimary) 
-        : cards.find(c => !c.isPrimary);
-      
+      const selectedCard = usePrimary
+        ? cards.find((c) => c.isPrimary)
+        : cards.find((c) => !c.isPrimary);
+
       return (selectedCard || cards[0]).cardId;
     }
-    
+
     // Single card account - use that card
     return cards[0].cardId;
   };
@@ -1754,6 +1784,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 15000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -1763,6 +1807,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 28500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -1772,6 +1830,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 22000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -1781,6 +1853,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 19500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -1790,6 +1876,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 15000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
 
     // Alexander's Amazon transactions (enrollment 1 - in progress)
@@ -1801,6 +1901,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 32000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -1810,6 +1924,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 25500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -1819,6 +1947,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 21000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
 
     // William's Amazon transactions (enrollment 2)
@@ -1830,6 +1972,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 18200,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[3].id,
@@ -1839,6 +1995,20 @@ async function seed() {
       category: "Online Shopping",
       amount: 27000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Amazon 3× Points",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction meets all offer criteria for 3× points reward",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            minPurchaseMet: true,
+            minPurchaseRequired: 2500,
+          },
+        },
+      },
     },
 
     // Isabella's Target transactions (enrollment 5)
@@ -1850,6 +2020,20 @@ async function seed() {
       category: "Retail",
       amount: 8500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction at Target qualifies for 5% weekend cashback",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: false,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[2].id,
@@ -1859,6 +2043,20 @@ async function seed() {
       category: "Retail",
       amount: 12000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction at Target qualifies for 5% weekend cashback",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: false,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[2].id,
@@ -1868,6 +2066,20 @@ async function seed() {
       category: "Retail",
       amount: 12000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction at Target qualifies for 5% weekend cashback",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: false,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
 
     // Sophia's Target transactions (enrollment 6 - completed)
@@ -1879,6 +2091,20 @@ async function seed() {
       category: "Retail",
       amount: 18000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Weekend purchase at Target qualifies for 5% cashback bonus",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: true,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[4].id,
@@ -1888,6 +2114,20 @@ async function seed() {
       category: "Retail",
       amount: 15500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Weekend purchase at Target qualifies for 5% cashback bonus",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: true,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[4].id,
@@ -1897,6 +2137,20 @@ async function seed() {
       category: "Retail",
       amount: 16500,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Target 5% Weekend",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Transaction at Target qualifies for 5% weekend cashback",
+          details: {
+            merchantMatch: true,
+            weekendPurchase: false,
+            cashbackPercent: 5,
+            maxCashback: 5000,
+          },
+        },
+      },
     },
 
     // James's Starbucks transactions (enrollment 8 - completed)
@@ -1908,6 +2162,20 @@ async function seed() {
       category: "Dining",
       amount: 850,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[5].id,
@@ -1917,6 +2185,20 @@ async function seed() {
       category: "Dining",
       amount: 720,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[5].id,
@@ -1926,6 +2208,20 @@ async function seed() {
       category: "Dining",
       amount: 980,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[5].id,
@@ -1935,6 +2231,20 @@ async function seed() {
       category: "Dining",
       amount: 1250,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[5].id,
@@ -1944,6 +2254,20 @@ async function seed() {
       category: "Dining",
       amount: 1200,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
 
     // Emma's Starbucks transactions (enrollment 9)
@@ -1955,6 +2279,20 @@ async function seed() {
       category: "Dining",
       amount: 650,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[6].id,
@@ -1964,6 +2302,20 @@ async function seed() {
       category: "Dining",
       amount: 1100,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[6].id,
@@ -1973,6 +2325,20 @@ async function seed() {
       category: "Dining",
       amount: 1450,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Starbucks Bonus",
+          campaignName: "Holiday Shopping Bonanza",
+          reason: "Starbucks purchase counts toward 500 bonus points goal",
+          details: {
+            merchantMatch: true,
+            categoryMatch: true,
+            bonusPoints: 500,
+            progressTowardGoal: true,
+          },
+        },
+      },
     },
 
     // Victoria's Travel transactions (enrollment 14)
@@ -1984,6 +2350,20 @@ async function seed() {
       category: "Travel",
       amount: 45000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Airline purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: true,
+            isHotel: false,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -1993,6 +2373,20 @@ async function seed() {
       category: "Travel",
       amount: 38000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Hotel purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: false,
+            isHotel: true,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -2002,6 +2396,20 @@ async function seed() {
       category: "Travel",
       amount: 52000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Airline purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: true,
+            isHotel: false,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -2011,6 +2419,20 @@ async function seed() {
       category: "Travel",
       amount: 21000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Hotel purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: false,
+            isHotel: true,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
 
     // Alexander's Travel transactions (enrollment 15 - completed)
@@ -2022,6 +2444,20 @@ async function seed() {
       category: "Travel",
       amount: 65000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Airline purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: true,
+            isHotel: false,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -2031,6 +2467,20 @@ async function seed() {
       category: "Travel",
       amount: 42000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Hotel purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: false,
+            isHotel: true,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -2040,6 +2490,20 @@ async function seed() {
       category: "Travel",
       amount: 35000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Airline purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: true,
+            isHotel: false,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -2049,6 +2513,20 @@ async function seed() {
       category: "Travel",
       amount: 58000,
       qualifiesForOffer: true,
+      metadata: {
+        qualification: {
+          qualified: true,
+          offerName: "Travel Miles Accelerator",
+          campaignName: "Summer Travel Campaign",
+          reason: "Hotel purchase earns 5× points on travel category",
+          details: {
+            categoryMatch: true,
+            isAirline: false,
+            isHotel: true,
+            pointsMultiplier: 5,
+          },
+        },
+      },
     },
 
     // Non-qualifying transactions (general spending)
@@ -2060,6 +2538,17 @@ async function seed() {
       category: "Groceries",
       amount: 15600,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offer enrollment for Groceries category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[0].id,
@@ -2069,6 +2558,17 @@ async function seed() {
       category: "Gas Stations",
       amount: 6500,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offer enrollment for Gas Stations category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            suggestion: "Enroll in Gas Station Rewards for 3× points",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[1].id,
@@ -2078,6 +2578,17 @@ async function seed() {
       category: "Groceries",
       amount: 9800,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offer enrollment for Groceries category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[2].id,
@@ -2087,6 +2598,17 @@ async function seed() {
       category: "Groceries",
       amount: 28500,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offer enrollment for Groceries category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[3].id,
@@ -2096,6 +2618,17 @@ async function seed() {
       category: "Electronics",
       amount: 125000,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offers available for Electronics category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            availableOffers: "None currently available",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[4].id,
@@ -2105,6 +2638,18 @@ async function seed() {
       category: "Retail",
       amount: 34500,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "Merchant does not match enrolled Target 5% Weekend offer",
+          details: {
+            categoryMatch: true,
+            merchantMatch: false,
+            enrolledOffer: "Target 5% Weekend",
+            requiredMerchant: "Target",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[5].id,
@@ -2114,6 +2659,17 @@ async function seed() {
       category: "Electronics",
       amount: 129900,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offers available for Electronics category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            availableOffers: "None currently available",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[6].id,
@@ -2123,6 +2679,18 @@ async function seed() {
       category: "Dining",
       amount: 8500,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "Merchant does not match enrolled Starbucks Bonus offer",
+          details: {
+            categoryMatch: true,
+            merchantMatch: false,
+            enrolledOffer: "Starbucks Bonus",
+            requiredMerchant: "Starbucks",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[9].id,
@@ -2132,6 +2700,17 @@ async function seed() {
       category: "Groceries",
       amount: 12300,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offer enrollment for this account",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
+          },
+        },
+      },
     },
     {
       accountId: createdAccounts[10].id,
@@ -2141,6 +2720,17 @@ async function seed() {
       category: "Pharmacy",
       amount: 4500,
       qualifiesForOffer: false,
+      metadata: {
+        qualification: {
+          qualified: false,
+          reason: "No active offers available for Pharmacy category",
+          details: {
+            categoryMatch: false,
+            merchantMatch: false,
+            availableOffers: "None currently available",
+          },
+        },
+      },
     },
   ];
 

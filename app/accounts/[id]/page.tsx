@@ -6,6 +6,7 @@ import { AccountTierBadge } from "@/components/account-tier-badge";
 import { AccountStatusBadge } from "@/components/account-status-badge";
 import { EnrollmentProgressCard } from "@/components/enrollment-progress-card";
 import { AccountTransactionsTab } from "@/components/account-transactions-tab";
+import { PersonalizedOffersTab } from "@/components/personalized-offers-tab";
 import { CreditCardProductBadge } from "@/components/credit-card-product-badge";
 import { creditCardProductDescriptions } from "@/lib/credit-card-utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
   Star,
   Clock,
   Activity,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -51,9 +53,8 @@ async function AccountDetailContent({ id }: { id: string }) {
 
   const enrollments = account.accountOfferEnrollments || [];
   const transactions = account.accountTransactions || [];
-  const spendingGroups = account.spendingGroupAccounts?.map(
-    (sga) => sga.spendingGroup
-  ) || [];
+  const spendingGroups =
+    account.spendingGroupAccounts?.map((sga) => sga.spendingGroup) || [];
   const creditCards = account.accountCreditCards || [];
 
   // Group enrollments by status
@@ -172,11 +173,15 @@ async function AccountDetailContent({ id }: { id: string }) {
       {/* Content Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="enrollments" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="personalized" className="gap-1">
+              <Sparkles className="h-3.5 w-3.5" />
+              Personalized
+            </TabsTrigger>
             <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
-            <TabsTrigger value="groups">Spending Groups</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
           </TabsList>
 
           {/* Enrollments Tab */}
@@ -295,6 +300,14 @@ async function AccountDetailContent({ id }: { id: string }) {
                 category: tx.category,
                 amount: tx.amount,
                 qualifiesForOffer: tx.qualifiesForOffer,
+                metadata: tx.metadata ?? undefined,
+                enrollment: tx.enrollment
+                  ? {
+                      offerName: tx.enrollment.offer.name,
+                      offerType: tx.enrollment.offer.type,
+                      campaignName: tx.enrollment.campaign?.name ?? null,
+                    }
+                  : null,
                 creditCard: tx.creditCard
                   ? {
                       id: tx.creditCard.id,
@@ -303,6 +316,15 @@ async function AccountDetailContent({ id }: { id: string }) {
                     }
                   : null,
               }))}
+            />
+          </TabsContent>
+
+          {/* Personalized Offers Tab */}
+          <TabsContent value="personalized">
+            <PersonalizedOffersTab
+              accountId={account.id}
+              firstName={account.firstName}
+              tier={account.tier}
             />
           </TabsContent>
 
@@ -342,9 +364,11 @@ async function AccountDetailContent({ id }: { id: string }) {
                               product={card.creditCardProduct}
                             />
                             <p className="text-xs text-muted-foreground">
-                              {creditCardProductDescriptions[
-                                card.creditCardProduct
-                              ]}
+                              {
+                                creditCardProductDescriptions[
+                                  card.creditCardProduct
+                                ]
+                              }
                             </p>
                           </div>
 
@@ -386,10 +410,7 @@ async function AccountDetailContent({ id }: { id: string }) {
                               <Clock className="h-4 w-4" />
                               <span>
                                 Expires{" "}
-                                {format(
-                                  new Date(card.expirationDate),
-                                  "MM/yy"
-                                )}
+                                {format(new Date(card.expirationDate), "MM/yy")}
                               </span>
                             </div>
                           </div>
@@ -540,4 +561,3 @@ export default async function AccountDetailPage({ params }: PageProps) {
     </Suspense>
   );
 }
-
