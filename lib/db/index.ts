@@ -399,3 +399,165 @@ export async function getAccountTransactions(
 
   return transactions;
 }
+
+// ==========================================
+// SPEND STIM SIMULATION HELPERS
+// ==========================================
+
+/**
+ * Get spending groups linked to a campaign via segments
+ * Used by Spend Stim simulation to find all accounts to analyze
+ */
+export async function getCampaignSpendingGroups(campaignId: string) {
+  // Step 1: Get campaign with its segments
+  const campaign = await db.query.campaigns.findFirst({
+    where: (campaigns, { eq }) => eq(campaigns.id, campaignId),
+    with: {
+      campaignSegments: {
+        with: {
+          segment: true,
+        },
+      },
+    },
+  });
+
+  if (!campaign || campaign.campaignSegments.length === 0) {
+    return [];
+  }
+
+  // Step 2: Get segment IDs
+  const segmentIds = campaign.campaignSegments.map((cs) => cs.segment.id);
+
+  // Step 3: Get spending group IDs linked to these segments
+  const segmentSpendingGroups = await db.query.segmentSpendingGroups.findMany({
+    where: (ssg, { inArray }) => inArray(ssg.segmentId, segmentIds),
+  });
+
+  if (segmentSpendingGroups.length === 0) {
+    return [];
+  }
+
+  const spendingGroupIds = [
+    ...new Set(segmentSpendingGroups.map((ssg) => ssg.spendingGroupId)),
+  ];
+
+  // Step 4: Get spending groups with their accounts
+  const spendingGroups = await db.query.spendingGroups.findMany({
+    where: (sg, { inArray }) => inArray(sg.id, spendingGroupIds),
+    with: {
+      spendingGroupAccounts: {
+        with: {
+          account: true,
+        },
+      },
+    },
+  });
+
+  // Step 5: Transform to expected format
+  return spendingGroups.map((sg) => ({
+    id: sg.id,
+    name: sg.name,
+    description: sg.description,
+    accounts: sg.spendingGroupAccounts.map((sga) => ({
+      id: sga.account.id,
+      firstName: sga.account.firstName,
+      lastName: sga.account.lastName,
+      tier: sga.account.tier,
+      annualSpend: sga.account.annualSpend,
+      accountNumber: sga.account.accountNumber,
+    })),
+  }));
+}
+
+/**
+ * Get accounts with their transaction history for a spending group
+ * Used by Spend Stim simulation to analyze historical spending patterns
+ */
+export async function getSpendingGroupAccountsWithTransactions(
+  spendingGroupId: string,
+  sinceDate?: Date
+) {
+  const group = await db.query.spendingGroups.findFirst({
+    where: (groups, { eq }) => eq(groups.id, spendingGroupId),
+    with: {
+      spendingGroupAccounts: {
+        with: {
+          account: {
+            with: {
+              accountTransactions: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!group) {
+    return [];
+  }
+
+  // Filter transactions by date if provided and return account with transactions
+  return group.spendingGroupAccounts.map((sga) => ({
+    id: sga.account.id,
+    firstName: sga.account.firstName,
+    lastName: sga.account.lastName,
+    tier: sga.account.tier,
+    annualSpend: sga.account.annualSpend,
+    accountNumber: sga.account.accountNumber,
+    transactions: sinceDate
+      ? sga.account.accountTransactions.filter(
+          (tx) => new Date(tx.transactionDate) >= sinceDate
+        )
+      : sga.account.accountTransactions,
+  }));
+}
+
+/**
+ * Get all accounts with their transaction history for multiple spending groups
+ * Used by Spend Stim simulation for campaigns targeting multiple spending groups
+ */
+export async function getAccountsWithTransactionsForCampaign(
+  campaignId: string,
+  sinceDate?: Date
+) {
+  const spendingGroups = await getCampaignSpendingGroups(campaignId);
+
+  if (spendingGroups.length === 0) {
+    return { spendingGroups: [], accounts: [] };
+  }
+
+  // Collect all unique account IDs from spending groups
+  const accountIdsSet = new Set<string>();
+  for (const sg of spendingGroups) {
+    for (const account of sg.accounts) {
+      accountIdsSet.add(account.id);
+    }
+  }
+
+  const accountIds = Array.from(accountIdsSet);
+
+  // Fetch all accounts with their transactions
+  const accounts = await db.query.accounts.findMany({
+    where: (accounts, { inArray }) => inArray(accounts.id, accountIds),
+    with: {
+      accountTransactions: {
+        orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+      },
+    },
+  });
+
+  // Filter transactions by date if provided
+  const accountsWithFilteredTransactions = accounts.map((account) => ({
+    ...account,
+    transactions: sinceDate
+      ? account.accountTransactions.filter(
+          (tx) => new Date(tx.transactionDate) >= sinceDate
+        )
+      : account.accountTransactions,
+  }));
+
+  return {
+    spendingGroups,
+    accounts: accountsWithFilteredTransactions,
+  };
+}

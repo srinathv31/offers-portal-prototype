@@ -1,7 +1,11 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCampaignWithRelations, getEnrollmentsByCampaign } from "@/lib/db";
+import {
+  getCampaignWithRelations,
+  getEnrollmentsByCampaign,
+  getCampaignSpendingGroups,
+} from "@/lib/db";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricKPI } from "@/components/metric-kpi";
 import { OfferListItem } from "@/components/offer-list-item";
@@ -24,6 +28,7 @@ import {
   User,
   Users,
   Target,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -34,9 +39,10 @@ interface PageProps {
 }
 
 async function CampaignDetailContent({ id }: { id: string }) {
-  const [campaign, enrollments] = await Promise.all([
+  const [campaign, enrollments, spendingGroups] = await Promise.all([
     getCampaignWithRelations(id),
     getEnrollmentsByCampaign(id),
+    getCampaignSpendingGroups(id),
   ]);
 
   if (!campaign) {
@@ -54,6 +60,13 @@ async function CampaignDetailContent({ id }: { id: string }) {
     projected_lift_pct?: number;
     error_rate_pct?: number;
   };
+  
+  // Check if campaign has linked spending groups for Spend Stim simulation
+  const hasSpendingGroups = spendingGroups.length > 0;
+  const totalSpendingGroupAccounts = spendingGroups.reduce(
+    (sum, sg) => sum + sg.accounts.length,
+    0
+  );
 
   // Group enrollments by status
   const enrollmentStats = {
@@ -108,6 +121,17 @@ async function CampaignDetailContent({ id }: { id: string }) {
                   Run E2E Test
                 </Button>
               </form>
+              {hasSpendingGroups && (
+                <form
+                  action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
+                  method="POST"
+                >
+                  <Button variant="outline" className="gap-2" type="submit">
+                    <TrendingUp className="h-4 w-4" />
+                    Run Spend Stim
+                  </Button>
+                </form>
+              )}
               {campaign.status === "IN_REVIEW" && (
                 <form
                   action={`/api/campaigns/${campaign.id}/publish`}

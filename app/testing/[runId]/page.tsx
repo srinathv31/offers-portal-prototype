@@ -20,18 +20,31 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  TrendingUp,
+  DollarSign,
+  ArrowUpRight,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AccountProjectionsTable } from "@/components/account-projections-table";
+import type { AccountProjection, SimulationType } from "@/lib/db/schema";
 
 interface SimulationRun {
   id: string;
   campaignId: string;
+  simulationType?: SimulationType;
+  spendingGroupId?: string | null;
   inputs: Record<string, any>;
   cohortSize: number;
   projections: {
+    // E2E Test projections
     revenue?: number;
     activations?: number;
     error_rate_pct?: number;
+    // Spend Stim projections
+    accountProjections?: AccountProjection[];
+    totalCurrentSpend?: number;
+    totalProjectedSpend?: number;
+    avgLiftPct?: number;
   };
   steps: Array<{
     key: string;
@@ -138,12 +151,26 @@ export default function TestRunnerPage({
   const completedSteps = run.steps.filter((s) => s.status === "DONE").length;
   const totalSteps = run.steps.length;
   const progress = (completedSteps / totalSteps) * 100;
+  
+  // Check if this is a Spend Stim simulation
+  const isSpendStim = run.simulationType === "SPEND_STIM";
+  const accountProjections = run.projections?.accountProjections || [];
 
   const statusColors: Record<string, string> = {
     PENDING: "bg-gray-500",
     RUNNING: "bg-blue-500",
     DONE: "bg-green-500",
     FAIL: "bg-red-500",
+  };
+  
+  // Helper to format currency
+  const formatCurrency = (cents: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(cents / 100);
   };
 
   return (
@@ -156,7 +183,17 @@ export default function TestRunnerPage({
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">E2E Test Run</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold">
+              {isSpendStim ? "Spend Stim Simulation" : "E2E Test Run"}
+            </h1>
+            {isSpendStim && (
+              <Badge variant="secondary" className="gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Spend Stim
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">Simulation Run ID: {run.id}</p>
         </div>
         <div className="flex gap-2">
@@ -254,16 +291,27 @@ export default function TestRunnerPage({
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Projections</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                {isSpendStim ? (
+                  <>
+                    <DollarSign className="h-5 w-5" />
+                    Spend Projections
+                  </>
+                ) : (
+                  "Projections"
+                )}
+              </CardTitle>
               <CardDescription>
-                Estimated results from simulation
+                {isSpendStim
+                  ? "Projected spending activity"
+                  : "Estimated results from simulation"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {run.cohortSize !== undefined && (
                 <div>
                   <div className="text-sm text-muted-foreground">
-                    Cohort Size
+                    {isSpendStim ? "Accounts Analyzed" : "Cohort Size"}
                   </div>
                   <div className="text-2xl font-bold">
                     {run.cohortSize.toLocaleString()}
@@ -271,79 +319,185 @@ export default function TestRunnerPage({
                 </div>
               )}
 
-              <div>
-                <div className="text-sm text-muted-foreground">
-                  Projected Revenue
-                </div>
-                {run.projections?.revenue !== undefined ? (
-                  <div className="text-2xl font-bold text-green-600">
-                    ${run.projections.revenue.toLocaleString()}
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
-                    {!run.finished ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Calculating...</span>
-                      </>
+              {isSpendStim ? (
+                <>
+                  {/* Spend Stim specific metrics */}
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Current Monthly Spend
+                    </div>
+                    {run.projections?.totalCurrentSpend !== undefined ? (
+                      <div className="text-2xl font-bold">
+                        {formatCurrency(run.projections.totalCurrentSpend)}
+                      </div>
                     ) : (
-                      <span>—</span>
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              <div>
-                <div className="text-sm text-muted-foreground">
-                  Projected Activations
-                </div>
-                {run.projections?.activations !== undefined ? (
-                  <div className="text-2xl font-bold">
-                    {run.projections.activations.toLocaleString()}
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
-                    {!run.finished ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Calculating...</span>
-                      </>
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Projected Monthly Spend
+                    </div>
+                    {run.projections?.totalProjectedSpend !== undefined ? (
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(run.projections.totalProjectedSpend)}
+                      </div>
                     ) : (
-                      <span>—</span>
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              <div>
-                <div className="text-sm text-muted-foreground">Error Rate</div>
-                {run.projections?.error_rate_pct !== undefined ? (
-                  <div
-                    className={`text-2xl font-bold ${
-                      run.projections.error_rate_pct > 1
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {run.projections.error_rate_pct.toFixed(2)}%
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
-                    {!run.finished ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>Calculating...</span>
-                      </>
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Average Lift
+                    </div>
+                    {run.projections?.avgLiftPct !== undefined ? (
+                      <div className="flex items-center gap-1">
+                        <ArrowUpRight className="h-5 w-5 text-green-500" />
+                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {run.projections.avgLiftPct.toFixed(1)}%
+                        </span>
+                      </div>
                     ) : (
-                      <span>—</span>
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Projected Revenue Lift
+                    </div>
+                    {run.projections?.revenue !== undefined ? (
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        +{formatCurrency(run.projections.revenue)}
+                      </div>
+                    ) : (
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* E2E Test metrics */}
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Projected Revenue
+                    </div>
+                    {run.projections?.revenue !== undefined ? (
+                      <div className="text-2xl font-bold text-green-600">
+                        ${run.projections.revenue.toLocaleString()}
+                      </div>
+                    ) : (
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      Projected Activations
+                    </div>
+                    {run.projections?.activations !== undefined ? (
+                      <div className="text-2xl font-bold">
+                        {run.projections.activations.toLocaleString()}
+                      </div>
+                    ) : (
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="text-sm text-muted-foreground">Error Rate</div>
+                    {run.projections?.error_rate_pct !== undefined ? (
+                      <div
+                        className={`text-2xl font-bold ${
+                          run.projections.error_rate_pct > 1
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {run.projections.error_rate_pct.toFixed(2)}%
+                      </div>
+                    ) : (
+                      <div className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+                        {!run.finished ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Calculating...</span>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Account Projections Table for Spend Stim simulations */}
+      {isSpendStim && accountProjections.length > 0 && (
+        <div className="mt-6">
+          <AccountProjectionsTable projections={accountProjections} />
+        </div>
+      )}
     </div>
   );
 }

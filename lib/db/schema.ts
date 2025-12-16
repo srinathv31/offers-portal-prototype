@@ -82,6 +82,11 @@ export const creditCardProductEnum = pgEnum("credit_card_product", [
   "CLEAR",
 ]);
 
+export const simulationTypeEnum = pgEnum("simulation_type", [
+  "E2E_TEST",
+  "SPEND_STIM",
+]);
+
 // TypeScript types from enums
 export type CampaignStatus =
   | "DRAFT"
@@ -111,6 +116,34 @@ export type CreditCardProduct =
   | "CASH_CREDIT"
   | "FIRST_CLASS"
   | "CLEAR";
+export type SimulationType = "E2E_TEST" | "SPEND_STIM";
+export type ProjectionConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+// Account projection type for Spend Stim simulations
+export interface AccountProjection {
+  accountId: string;
+  accountName: string;
+  tier: AccountTier;
+  currentMonthlySpend: number;
+  projectedMonthlySpend: number;
+  projectedLift: number;
+  projectedLiftPct: number;
+  categoryBreakdown: Record<string, number>;
+  confidence: ProjectionConfidence;
+}
+
+// Extended projections type that supports both E2E and Spend Stim simulations
+export interface SimulationProjections {
+  // E2E Test projections
+  revenue?: number;
+  activations?: number;
+  error_rate_pct?: number;
+  // Spend Stim projections
+  accountProjections?: AccountProjection[];
+  totalCurrentSpend?: number;
+  totalProjectedSpend?: number;
+  avgLiftPct?: number;
+}
 
 // ==========================================
 // ACCOUNT-LEVEL TABLES
@@ -347,13 +380,13 @@ export const simulationRuns = pgTable("simulation_runs", {
   campaignId: uuid("campaign_id")
     .notNull()
     .references(() => campaigns.id),
+  simulationType: simulationTypeEnum("simulation_type")
+    .notNull()
+    .default("E2E_TEST"),
+  spendingGroupId: uuid("spending_group_id").references(() => spendingGroups.id),
   inputs: jsonb("inputs").default({}).$type<Record<string, any>>(),
   cohortSize: jsonb("cohort_size").$type<number>(),
-  projections: jsonb("projections").default({}).$type<{
-    revenue?: number;
-    activations?: number;
-    error_rate_pct?: number;
-  }>(),
+  projections: jsonb("projections").default({}).$type<SimulationProjections>(),
   steps: jsonb("steps").default([]).$type<
     Array<{
       key: string;
@@ -468,6 +501,7 @@ export const spendingGroupsRelations = relations(
   ({ many }) => ({
     spendingGroupAccounts: many(spendingGroupAccounts),
     segmentSpendingGroups: many(segmentSpendingGroups),
+    simulationRuns: many(simulationRuns),
   })
 );
 
@@ -613,6 +647,10 @@ export const simulationRunsRelations = relations(simulationRuns, ({ one }) => ({
   campaign: one(campaigns, {
     fields: [simulationRuns.campaignId],
     references: [campaigns.id],
+  }),
+  spendingGroup: one(spendingGroups, {
+    fields: [simulationRuns.spendingGroupId],
+    references: [spendingGroups.id],
   }),
 }));
 
