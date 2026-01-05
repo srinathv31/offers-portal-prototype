@@ -3,6 +3,12 @@
  *
  * This file orchestrates all seed-data modules to populate the database
  * with mock data for development and demo purposes.
+ *
+ * Data Scale (using faker.js):
+ * - 200 accounts across 4 tiers
+ * - ~8,000 transactions (30-50 per account)
+ * - ~100 offer enrollments
+ * - 5 spending groups with dynamic account assignment
  */
 
 import { db } from "./index";
@@ -74,25 +80,33 @@ function printSummary(data: {
   enrollments: { length: number };
   transactions: { length: number };
 }) {
+  const avgTransactionsPerAccount = Math.round(
+    data.transactions.length / data.accounts.length
+  );
+
   console.log("\n✅ Database seed completed successfully!");
-  console.log("\nSummary:");
-  console.log(`- ${data.offers.length} offers`);
-  console.log(`- ${data.segments.length} segments`);
-  console.log(`- ${data.rules.length} eligibility rules`);
-  console.log("- 3 campaigns (1 LIVE, 1 IN_REVIEW, 1 ENDED)");
-  console.log("- 1 channel plan");
-  console.log("- 1 fulfillment plan");
-  console.log("- 1 control checklist");
-  console.log("- 9 approvals");
-  console.log("- 4 audit log entries");
-  console.log("- 2 simulation runs (1 E2E Test, 1 Spend Stim)");
-  console.log(`- ${data.accounts.length} accounts`);
-  console.log(`- ${data.creditCards.length} credit cards`);
-  console.log(`- ${data.accountCreditCardsData.length} account-credit card links`);
-  console.log(`- ${data.spendingGroups.length} spending groups`);
-  console.log(`- ${data.spendingGroupAccountsData.length} account-group links`);
-  console.log(`- ${data.enrollments.length} offer enrollments`);
-  console.log(`- ${data.transactions.length} transactions`);
+  console.log("\n📊 Summary:");
+  console.log("━".repeat(50));
+  console.log(`  Offers:              ${data.offers.length}`);
+  console.log(`  Segments:            ${data.segments.length}`);
+  console.log(`  Eligibility Rules:   ${data.rules.length}`);
+  console.log(`  Campaigns:           3 (LIVE, IN_REVIEW, ENDED)`);
+  console.log("━".repeat(50));
+  console.log(`  Accounts:            ${data.accounts.length}`);
+  console.log(`  Credit Cards:        ${data.creditCards.length}`);
+  console.log(`  Card-Account Links:  ${data.accountCreditCardsData.length}`);
+  console.log("━".repeat(50));
+  console.log(`  Spending Groups:     ${data.spendingGroups.length}`);
+  console.log(`  Group Memberships:   ${data.spendingGroupAccountsData.length}`);
+  console.log("━".repeat(50));
+  console.log(`  Enrollments:         ${data.enrollments.length}`);
+  console.log(`  Transactions:        ${data.transactions.length}`);
+  console.log(`  Avg Tx/Account:      ${avgTransactionsPerAccount}`);
+  console.log("━".repeat(50));
+  console.log("\n🎯 Ready for demo!");
+  console.log("   - All accounts have 30-50 transactions for HIGH confidence projections");
+  console.log("   - Transactions are aligned with spending group categories");
+  console.log("   - Spend Stim simulation will show improved lift projections");
 }
 
 /**
@@ -100,9 +114,15 @@ function printSummary(data: {
  */
 async function seed() {
   console.log("🌱 Starting database seed...\n");
+  console.log("═".repeat(50));
+
+  const startTime = Date.now();
 
   // Clear existing data
   await clearDatabase();
+
+  console.log("\n📦 Seeding campaign & offer data...");
+  console.log("─".repeat(50));
 
   // ==========================================
   // CAMPAIGN & OFFER DATA (no dependencies)
@@ -126,22 +146,29 @@ async function seed() {
     controlChecklistId: plans.controlChecklist.id,
   });
 
+  console.log("\n👥 Seeding account data...");
+  console.log("─".repeat(50));
+
   // ==========================================
   // ACCOUNT-LEVEL DATA
   // ==========================================
 
-  // Seed accounts
+  // Seed accounts (200 accounts with tier distribution)
   const accounts = await seedAccounts();
 
   // Seed credit cards (depends on accounts)
   const { creditCards, accountCreditCardsData } = await seedCreditCards(accounts);
 
   // Seed spending groups (depends on accounts, segments, campaigns)
-  const { spendingGroups, spendingGroupAccountsData } = await seedSpendingGroups({
-    accounts,
-    segments,
-    campaigns,
-  });
+  const { spendingGroups, spendingGroupAccountsData, groupAssignments } =
+    await seedSpendingGroups({
+      accounts,
+      segments,
+      campaigns,
+    });
+
+  console.log("\n📈 Seeding enrollment & transaction data...");
+  console.log("─".repeat(50));
 
   // Seed enrollments (depends on accounts, offers, campaigns)
   const enrollments = await seedEnrollments({
@@ -150,12 +177,17 @@ async function seed() {
     campaigns,
   });
 
-  // Seed transactions (depends on accounts, enrollments, credit cards)
+  // Seed transactions (depends on accounts, enrollments, credit cards, spending groups)
   const transactions = await seedTransactions({
     accounts,
     enrollments,
+    offers,
     accountCreditCardsData,
+    groupAssignments,
   });
+
+  const endTime = Date.now();
+  const duration = ((endTime - startTime) / 1000).toFixed(2);
 
   // Print summary
   printSummary({
@@ -170,6 +202,8 @@ async function seed() {
     enrollments,
     transactions,
   });
+
+  console.log(`\n⏱️  Completed in ${duration}s`);
 }
 
 // Execute seed

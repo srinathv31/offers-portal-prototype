@@ -1,9 +1,48 @@
+/**
+ * Seed transactions with realistic spending patterns
+ *
+ * Generates 30-50 transactions per account over the last 90 days,
+ * aligned with the account's spending group categories.
+ */
+
+import { faker } from "@faker-js/faker";
 import { db } from "../index";
 import * as schema from "../schema";
+import type { AccountTier } from "../schema";
+import {
+  generateTransactionDate,
+  generateTransactionAmount,
+  getTierMultiplier,
+  getMerchantsForAccount,
+  GENERAL_MERCHANTS,
+  type MerchantConfig,
+  type SpendingGroupAssignment,
+  type SpendingProfile,
+} from "./generators";
 import { buildAccountToCardsMap, selectCardForTransaction } from "./utils";
 
-type Account = { id: string };
-type Enrollment = { id: string };
+// Re-seed faker for transaction generation
+faker.seed(54321);
+
+interface Account {
+  id: string;
+  tier: AccountTier;
+  spendingProfile: SpendingProfile;
+}
+
+interface Enrollment {
+  id: string;
+  accountId: string;
+  offerId: string;
+  status: string;
+}
+
+interface Offer {
+  id: string;
+  name: string;
+  vendor: string | null;
+  parameters: Record<string, unknown> | null;
+}
 
 interface AccountCreditCardLink {
   accountId: string;
@@ -15,993 +54,280 @@ interface AccountCreditCardLink {
 interface SeedTransactionsDeps {
   accounts: Account[];
   enrollments: Enrollment[];
+  offers: Offer[];
   accountCreditCardsData: AccountCreditCardLink[];
+  groupAssignments: Map<string, SpendingGroupAssignment[]>;
 }
 
 /**
  * Seed account transactions with offer qualification metadata
+ * Generates 30-50 transactions per account aligned with spending groups
  */
 export async function seedTransactions(deps: SeedTransactionsDeps) {
-  const { accounts, enrollments, accountCreditCardsData } = deps;
+  const { accounts, enrollments, offers, accountCreditCardsData, groupAssignments } =
+    deps;
 
   console.log("Creating account transactions...");
 
   // Build account to cards mapping for smart card selection
   const accountToCards = buildAccountToCardsMap(accountCreditCardsData);
 
-  const transactionsData = [
-    // Victoria's Amazon transactions (enrollment 0 - completed)
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[0].id,
-      transactionDate: new Date("2025-11-05"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 15000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[0].id,
-      transactionDate: new Date("2025-11-10"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 28500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[0].id,
-      transactionDate: new Date("2025-11-15"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 22000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[0].id,
-      transactionDate: new Date("2025-11-20"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 19500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[0].id,
-      transactionDate: new Date("2025-11-28"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 15000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
+  // Build enrollment lookup map: accountId -> enrollment details
+  const enrollmentMap = new Map<
+    string,
+    { enrollmentId: string; offerId: string; vendor: string | null; category: string }
+  >();
 
-    // Alexander's Amazon transactions (enrollment 1 - in progress)
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[1].id,
-      transactionDate: new Date("2025-11-08"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 32000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[1].id,
-      transactionDate: new Date("2025-11-18"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 25500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[1].id,
-      transactionDate: new Date("2025-11-25"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 21000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
+  for (const enrollment of enrollments) {
+    if (enrollment.status === "IN_PROGRESS" || enrollment.status === "COMPLETED") {
+      const offer = offers.find((o) => o.id === enrollment.offerId);
+      if (offer) {
+        const category =
+          (offer.parameters?.category as string) ||
+          (offer.vendor ? "Vendor-specific" : "General");
+        enrollmentMap.set(`${enrollment.accountId}-${enrollment.offerId}`, {
+          enrollmentId: enrollment.id,
+          offerId: enrollment.offerId,
+          vendor: offer.vendor,
+          category,
+        });
+      }
+    }
+  }
 
-    // William's Amazon transactions (enrollment 2)
-    {
-      accountId: accounts[3].id,
-      enrollmentId: enrollments[2].id,
-      transactionDate: new Date("2025-11-12"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 18200,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[3].id,
-      enrollmentId: enrollments[2].id,
-      transactionDate: new Date("2025-11-22"),
-      merchant: "Amazon",
-      category: "Online Shopping",
-      amount: 27000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Amazon 3× Points",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction meets all offer criteria for 3× points reward",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            minPurchaseMet: true,
-            minPurchaseRequired: 2500,
-          },
-        },
-      },
-    },
+  // Build account enrollment lookup
+  const accountEnrollments = new Map<
+    string,
+    Array<{ enrollmentId: string; vendor: string | null; category: string; offerName: string }>
+  >();
 
-    // Isabella's Target transactions (enrollment 5)
-    {
-      accountId: accounts[2].id,
-      enrollmentId: enrollments[5].id,
-      transactionDate: new Date("2025-11-04"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 8500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction at Target qualifies for 5% weekend cashback",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: false,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[2].id,
-      enrollmentId: enrollments[5].id,
-      transactionDate: new Date("2025-11-11"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 12000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction at Target qualifies for 5% weekend cashback",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: false,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[2].id,
-      enrollmentId: enrollments[5].id,
-      transactionDate: new Date("2025-11-18"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 12000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction at Target qualifies for 5% weekend cashback",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: false,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
+  for (const enrollment of enrollments) {
+    if (enrollment.status === "IN_PROGRESS" || enrollment.status === "COMPLETED") {
+      const offer = offers.find((o) => o.id === enrollment.offerId);
+      if (offer) {
+        const category =
+          (offer.parameters?.category as string) ||
+          (offer.vendor ? "Vendor-specific" : "General");
+        const existing = accountEnrollments.get(enrollment.accountId) || [];
+        existing.push({
+          enrollmentId: enrollment.id,
+          vendor: offer.vendor,
+          category,
+          offerName: offer.name,
+        });
+        accountEnrollments.set(enrollment.accountId, existing);
+      }
+    }
+  }
 
-    // Sophia's Target transactions (enrollment 6 - completed)
-    {
-      accountId: accounts[4].id,
-      enrollmentId: enrollments[6].id,
-      transactionDate: new Date("2025-11-09"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 18000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Weekend purchase at Target qualifies for 5% cashback bonus",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: true,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[4].id,
-      enrollmentId: enrollments[6].id,
-      transactionDate: new Date("2025-11-16"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 15500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Weekend purchase at Target qualifies for 5% cashback bonus",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: true,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[4].id,
-      enrollmentId: enrollments[6].id,
-      transactionDate: new Date("2025-11-25"),
-      merchant: "Target",
-      category: "Retail",
-      amount: 16500,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Target 5% Weekend",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Transaction at Target qualifies for 5% weekend cashback",
-          details: {
-            merchantMatch: true,
-            weekendPurchase: false,
-            cashbackPercent: 5,
-            maxCashback: 5000,
-          },
-        },
-      },
-    },
+  const allTransactions: Array<{
+    accountId: string;
+    enrollmentId: string | null;
+    creditCardId: string;
+    transactionDate: Date;
+    merchant: string;
+    category: string;
+    amount: number;
+    qualifiesForOffer: boolean;
+    metadata: Record<string, unknown>;
+  }> = [];
 
-    // James's Starbucks transactions (enrollment 8 - completed)
-    {
-      accountId: accounts[5].id,
-      enrollmentId: enrollments[8].id,
-      transactionDate: new Date("2025-11-03"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 850,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[5].id,
-      enrollmentId: enrollments[8].id,
-      transactionDate: new Date("2025-11-05"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 720,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[5].id,
-      enrollmentId: enrollments[8].id,
-      transactionDate: new Date("2025-11-08"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 980,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[5].id,
-      enrollmentId: enrollments[8].id,
-      transactionDate: new Date("2025-11-10"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 1250,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[5].id,
-      enrollmentId: enrollments[8].id,
-      transactionDate: new Date("2025-11-12"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 1200,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
+  // Generate transactions for each account
+  for (const account of accounts) {
+    // Determine transaction count (30-50, influenced by tier)
+    const baseCount = faker.number.int({ min: 30, max: 50 });
+    const tierBonus =
+      account.tier === "DIAMOND"
+        ? 10
+        : account.tier === "PLATINUM"
+        ? 5
+        : account.tier === "GOLD"
+        ? 2
+        : 0;
+    const transactionCount = baseCount + tierBonus;
 
-    // Emma's Starbucks transactions (enrollment 9)
-    {
-      accountId: accounts[6].id,
-      enrollmentId: enrollments[9].id,
-      transactionDate: new Date("2025-11-07"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 650,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[6].id,
-      enrollmentId: enrollments[9].id,
-      transactionDate: new Date("2025-11-14"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 1100,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[6].id,
-      enrollmentId: enrollments[9].id,
-      transactionDate: new Date("2025-11-21"),
-      merchant: "Starbucks",
-      category: "Dining",
-      amount: 1450,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Starbucks Bonus",
-          campaignName: "Holiday Shopping Bonanza",
-          reason: "Starbucks purchase counts toward 500 bonus points goal",
-          details: {
-            merchantMatch: true,
-            categoryMatch: true,
-            bonusPoints: 500,
-            progressTowardGoal: true,
-          },
-        },
-      },
-    },
+    // Get merchants based on spending group membership
+    const groupMerchants = getMerchantsForAccount(account.id, groupAssignments);
+    const tierMultiplier = getTierMultiplier(account.tier);
 
-    // Victoria's Travel transactions (enrollment 14)
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[14].id,
-      transactionDate: new Date("2025-09-15"),
-      merchant: "Delta Airlines",
-      category: "Travel",
-      amount: 45000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Airline purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: true,
-            isHotel: false,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[14].id,
-      transactionDate: new Date("2025-10-05"),
-      merchant: "Marriott Hotels",
-      category: "Travel",
-      amount: 38000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Hotel purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: false,
-            isHotel: true,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[14].id,
-      transactionDate: new Date("2025-10-20"),
-      merchant: "United Airlines",
-      category: "Travel",
-      amount: 52000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Airline purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: true,
-            isHotel: false,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: enrollments[14].id,
-      transactionDate: new Date("2025-11-10"),
-      merchant: "Hilton",
-      category: "Travel",
-      amount: 21000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Hotel purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: false,
-            isHotel: true,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
+    // Get enrollments for this account
+    const accountEnrollmentList = accountEnrollments.get(account.id) || [];
 
-    // Alexander's Travel transactions (enrollment 15 - completed)
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[15].id,
-      transactionDate: new Date("2025-08-20"),
-      merchant: "American Airlines",
-      category: "Travel",
-      amount: 65000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Airline purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: true,
-            isHotel: false,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[15].id,
-      transactionDate: new Date("2025-09-10"),
-      merchant: "Hyatt Hotels",
-      category: "Travel",
-      amount: 42000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Hotel purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: false,
-            isHotel: true,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[15].id,
-      transactionDate: new Date("2025-10-15"),
-      merchant: "Southwest Airlines",
-      category: "Travel",
-      amount: 35000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Airline purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: true,
-            isHotel: false,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: enrollments[15].id,
-      transactionDate: new Date("2025-11-05"),
-      merchant: "Four Seasons",
-      category: "Travel",
-      amount: 58000,
-      qualifiesForOffer: true,
-      metadata: {
-        qualification: {
-          qualified: true,
-          offerName: "Travel Miles Accelerator",
-          campaignName: "Summer Travel Campaign",
-          reason: "Hotel purchase earns 5× points on travel category",
-          details: {
-            categoryMatch: true,
-            isAirline: false,
-            isHotel: true,
-            pointsMultiplier: 5,
-          },
-        },
-      },
-    },
+    // 70% group-aligned transactions, 30% general
+    const groupTransactionCount = Math.round(transactionCount * 0.7);
+    const generalTransactionCount = transactionCount - groupTransactionCount;
 
-    // Non-qualifying transactions (general spending)
-    {
-      accountId: accounts[0].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-02"),
-      merchant: "Whole Foods",
-      category: "Groceries",
-      amount: 15600,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offer enrollment for Groceries category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[0].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-08"),
-      merchant: "Shell Gas",
-      category: "Gas Stations",
-      amount: 6500,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offer enrollment for Gas Stations category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            suggestion: "Enroll in Gas Station Rewards for 3× points",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[1].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-12"),
-      merchant: "Trader Joe's",
-      category: "Groceries",
-      amount: 9800,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offer enrollment for Groceries category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[2].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-06"),
-      merchant: "Costco",
-      category: "Groceries",
-      amount: 28500,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offer enrollment for Groceries category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[3].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-15"),
-      merchant: "Best Buy",
-      category: "Electronics",
-      amount: 125000,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offers available for Electronics category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            availableOffers: "None currently available",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[4].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-20"),
-      merchant: "Nordstrom",
-      category: "Retail",
-      amount: 34500,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "Merchant does not match enrolled Target 5% Weekend offer",
-          details: {
-            categoryMatch: true,
-            merchantMatch: false,
-            enrolledOffer: "Target 5% Weekend",
-            requiredMerchant: "Target",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[5].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-18"),
-      merchant: "Apple Store",
-      category: "Electronics",
-      amount: 129900,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offers available for Electronics category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            availableOffers: "None currently available",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[6].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-22"),
-      merchant: "Cheesecake Factory",
-      category: "Dining",
-      amount: 8500,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "Merchant does not match enrolled Starbucks Bonus offer",
-          details: {
-            categoryMatch: true,
-            merchantMatch: false,
-            enrolledOffer: "Starbucks Bonus",
-            requiredMerchant: "Starbucks",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[9].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-10"),
-      merchant: "Safeway",
-      category: "Groceries",
-      amount: 12300,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offer enrollment for this account",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            suggestion: "Enroll in Recurring Groceries Booster for 2× points",
-          },
-        },
-      },
-    },
-    {
-      accountId: accounts[10].id,
-      enrollmentId: null,
-      transactionDate: new Date("2025-11-14"),
-      merchant: "CVS",
-      category: "Pharmacy",
-      amount: 4500,
-      qualifiesForOffer: false,
-      metadata: {
-        qualification: {
-          qualified: false,
-          reason: "No active offers available for Pharmacy category",
-          details: {
-            categoryMatch: false,
-            merchantMatch: false,
-            availableOffers: "None currently available",
-          },
-        },
-      },
-    },
-  ];
+    // Generate group-aligned transactions
+    for (let i = 0; i < groupTransactionCount; i++) {
+      const merchant =
+        groupMerchants.length > 0
+          ? faker.helpers.arrayElement(groupMerchants)
+          : faker.helpers.arrayElement(GENERAL_MERCHANTS);
 
-  // Add credit card IDs to transactions using intelligent card selection
-  const transactionsWithCards = transactionsData.map((tx) => ({
-    ...tx,
-    creditCardId: selectCardForTransaction(
-      tx.accountId,
-      tx.category,
-      accountToCards
-    ),
-  }));
+      const transaction = generateTransaction(
+        account,
+        merchant,
+        tierMultiplier,
+        accountEnrollmentList,
+        accountToCards
+      );
+      allTransactions.push(transaction);
+    }
 
-  await db.insert(schema.accountTransactions).values(transactionsWithCards);
-  console.log(`✓ Created ${transactionsWithCards.length} transactions`);
+    // Generate general transactions
+    for (let i = 0; i < generalTransactionCount; i++) {
+      const merchant = faker.helpers.arrayElement(GENERAL_MERCHANTS);
+      const transaction = generateTransaction(
+        account,
+        merchant,
+        tierMultiplier,
+        accountEnrollmentList,
+        accountToCards
+      );
+      allTransactions.push(transaction);
+    }
+  }
 
-  return transactionsWithCards;
+  // Sort all transactions by date descending
+  allTransactions.sort(
+    (a, b) => b.transactionDate.getTime() - a.transactionDate.getTime()
+  );
+
+  // Insert in batches to avoid overwhelming the database
+  const batchSize = 500;
+  for (let i = 0; i < allTransactions.length; i += batchSize) {
+    const batch = allTransactions.slice(i, i + batchSize);
+    await db.insert(schema.accountTransactions).values(batch);
+  }
+
+  // Calculate statistics
+  const qualifyingCount = allTransactions.filter((t) => t.qualifiesForOffer).length;
+  const avgPerAccount = Math.round(allTransactions.length / accounts.length);
+
+  console.log(`✓ Created ${allTransactions.length} transactions`);
+  console.log(
+    `  Average per account: ${avgPerAccount}, Qualifying for offers: ${qualifyingCount}`
+  );
+
+  return allTransactions;
 }
 
+/**
+ * Generate a single transaction with proper qualification logic
+ */
+function generateTransaction(
+  account: Account,
+  merchant: MerchantConfig,
+  tierMultiplier: number,
+  accountEnrollments: Array<{
+    enrollmentId: string;
+    vendor: string | null;
+    category: string;
+    offerName: string;
+  }>,
+  accountToCards: Map<string, Array<{ cardId: string; isPrimary: boolean; preferredCategory: string | null }>>
+): {
+  accountId: string;
+  enrollmentId: string | null;
+  creditCardId: string;
+  transactionDate: Date;
+  merchant: string;
+  category: string;
+  amount: number;
+  qualifiesForOffer: boolean;
+  metadata: Record<string, unknown>;
+} {
+  const amount = generateTransactionAmount(merchant, tierMultiplier);
+  const date = generateTransactionDate(90);
+  const creditCardId = selectCardForTransaction(
+    account.id,
+    merchant.category,
+    accountToCards
+  );
+
+  // Check if this transaction qualifies for any enrollment
+  let qualifiesForOffer = false;
+  let enrollmentId: string | null = null;
+  let qualificationMetadata: Record<string, unknown> = {};
+
+  for (const enrollment of accountEnrollments) {
+    const matchesVendor =
+      enrollment.vendor && merchant.name.includes(enrollment.vendor);
+    const matchesCategory =
+      enrollment.category === merchant.category ||
+      (enrollment.category === "Online Shopping" &&
+        merchant.category === "Online Shopping") ||
+      (enrollment.category === "Travel" && merchant.category === "Travel") ||
+      (enrollment.category === "Dining" && merchant.category === "Dining") ||
+      (enrollment.category === "Groceries" && merchant.category === "Groceries");
+
+    if (matchesVendor || matchesCategory) {
+      qualifiesForOffer = true;
+      enrollmentId = enrollment.enrollmentId;
+      qualificationMetadata = {
+        qualification: {
+          qualified: true,
+          offerName: enrollment.offerName,
+          reason: matchesVendor
+            ? `Transaction at ${merchant.name} qualifies for ${enrollment.offerName}`
+            : `Transaction in ${merchant.category} category qualifies for ${enrollment.offerName}`,
+          details: {
+            merchantMatch: !!matchesVendor,
+            categoryMatch: matchesCategory,
+            vendor: enrollment.vendor,
+            category: enrollment.category,
+          },
+        },
+      };
+      break;
+    }
+  }
+
+  if (!qualifiesForOffer) {
+    qualificationMetadata = {
+      qualification: {
+        qualified: false,
+        reason: `No active offer enrollment for ${merchant.category} category`,
+        details: {
+          merchantMatch: false,
+          categoryMatch: false,
+          suggestion: getSuggestionForCategory(merchant.category),
+        },
+      },
+    };
+  }
+
+  return {
+    accountId: account.id,
+    enrollmentId,
+    creditCardId,
+    transactionDate: date,
+    merchant: merchant.name,
+    category: merchant.category,
+    amount,
+    qualifiesForOffer,
+    metadata: qualificationMetadata,
+  };
+}
+
+/**
+ * Get suggestion for unenrolled category
+ */
+function getSuggestionForCategory(category: string): string {
+  const suggestions: Record<string, string> = {
+    "Online Shopping": "Enroll in Amazon 3× Points for bonus rewards",
+    Travel: "Enroll in Travel Miles Accelerator for 5× points",
+    Dining: "Enroll in Starbucks Bonus for 500 bonus points",
+    Groceries: "Enroll in Recurring Groceries Booster for 2× points",
+    "Gas Stations": "Enroll in Gas Station Rewards for 3× points",
+    Retail: "Enroll in Target 5% Weekend for cashback",
+    Electronics: "No current offers available for Electronics",
+    "Food Delivery": "Enroll in Dining Cashback for 3% cashback",
+    Pharmacy: "No current offers available for Pharmacy",
+    Entertainment: "No current offers available for Entertainment",
+    Utilities: "No current offers available for Utilities",
+    "Home Improvement": "No current offers available for Home Improvement",
+  };
+
+  return suggestions[category] || "Check available offers for this category";
+}
