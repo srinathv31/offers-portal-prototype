@@ -104,9 +104,9 @@ function printSummary(data: {
   console.log(`  Avg Tx/Account:      ${avgTransactionsPerAccount}`);
   console.log("━".repeat(50));
   console.log("\n🎯 Ready for demo!");
-  console.log("   - All accounts have 30-50 transactions for HIGH confidence projections");
+  console.log("   - Confidence distribution: 80% HIGH, 15% MEDIUM, 5% LOW");
   console.log("   - Transactions are aligned with spending group categories");
-  console.log("   - Spend Stim simulation will show improved lift projections");
+  console.log("   - Spend Stim simulation will show varied confidence levels");
 }
 
 /**
