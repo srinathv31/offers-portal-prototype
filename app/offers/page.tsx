@@ -19,6 +19,7 @@ interface Offer {
   vendor: string | null;
   parameters: Record<string, unknown>;
   campaignOffers: Array<{ campaign: { id: string; name: string; status: string } }>;
+  disclosures: Array<{ id: string }>;
 }
 
 export default function OffersPage() {
@@ -27,29 +28,34 @@ export default function OffersPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+
+  const fetchOffers = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (vendorFilter !== "all") params.set("vendor", vendorFilter);
+
+      const res = await fetch(`/api/offers?${params.toString()}`);
+      const data = await res.json();
+      setOffers(data);
+    } catch (error) {
+      console.error("Failed to fetch offers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOffers = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (search) params.set("search", search);
-        if (typeFilter !== "all") params.set("type", typeFilter);
-        if (vendorFilter !== "all") params.set("vendor", vendorFilter);
-
-        const res = await fetch(`/api/offers?${params.toString()}`);
-        const data = await res.json();
-        setOffers(data);
-      } catch (error) {
-        console.error("Failed to fetch offers:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const debounce = setTimeout(fetchOffers, 300);
     return () => clearTimeout(debounce);
-  }, [search, typeFilter, vendorFilter]);
+  }, [search, typeFilter, vendorFilter, fetchTrigger]);
+
+  const handleDisclosureUploaded = () => {
+    setFetchTrigger((prev) => prev + 1);
+  };
 
   // Get unique vendors from offers
   const uniqueVendors = Array.from(
@@ -137,6 +143,8 @@ export default function OffersPage() {
                 vendor={offer.vendor}
                 parameters={offer.parameters}
                 campaignCount={offer.campaignOffers.length}
+                disclosureCount={offer.disclosures?.length ?? 0}
+                onDisclosureUploaded={handleDisclosureUploaded}
               />
             ))}
           </div>

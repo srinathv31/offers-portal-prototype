@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
 
@@ -21,7 +21,11 @@ export async function getCampaignWithRelations(campaignId: string) {
     with: {
       campaignOffers: {
         with: {
-          offer: true,
+          offer: {
+            with: {
+              disclosures: true,
+            },
+          },
         },
       },
       campaignSegments: {
@@ -42,6 +46,10 @@ export async function getCampaignWithRelations(campaignId: string) {
         orderBy: (runs, { desc }) => [desc(runs.createdAt)],
         limit: 1,
       },
+      campaignDisclosures: {
+        orderBy: (d, { desc }) => [desc(d.generatedAt)],
+        limit: 1,
+      },
     },
   });
 
@@ -57,6 +65,7 @@ export async function getOfferWithCampaigns(offerId: string) {
           campaign: true,
         },
       },
+      disclosures: true,
     },
   });
 
@@ -77,6 +86,7 @@ export async function getAllOffers(filters?: OfferFilters) {
           campaign: true,
         },
       },
+      disclosures: true,
     },
     orderBy: (offers, { desc }) => [desc(offers.createdAt)],
   });
@@ -560,4 +570,48 @@ export async function getAccountsWithTransactionsForCampaign(
     spendingGroups,
     accounts: accountsWithFilteredTransactions,
   };
+}
+
+// ==========================================
+// DISCLOSURE HELPERS
+// ==========================================
+
+export async function getOfferDisclosures(offerId: string) {
+  return db.query.offerDisclosures.findMany({
+    where: (d, { eq }) => eq(d.offerId, offerId),
+    orderBy: (d, { desc }) => [desc(d.createdAt)],
+  });
+}
+
+export async function getCampaignDisclosure(campaignId: string) {
+  return db.query.campaignDisclosures.findFirst({
+    where: (d, { eq }) => eq(d.campaignId, campaignId),
+    orderBy: (d, { desc }) => [desc(d.generatedAt)],
+  });
+}
+
+export async function getDisclosuresForCampaignOffers(campaignId: string) {
+  const campaign = await db.query.campaigns.findFirst({
+    where: (c, { eq }) => eq(c.id, campaignId),
+    with: {
+      campaignOffers: {
+        with: {
+          offer: {
+            with: {
+              disclosures: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!campaign) return [];
+
+  return campaign.campaignOffers
+    .map((co) => ({
+      offer: co.offer,
+      disclosures: co.offer.disclosures,
+    }))
+    .filter((item) => item.disclosures.length > 0);
 }
