@@ -2,8 +2,9 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, Trash2, Download, Loader2 } from "lucide-react";
+import { FileText, Upload, Trash2, Download, Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { DisclosureViewer } from "@/components/disclosure-viewer";
 
 interface Disclosure {
   id: string;
@@ -44,6 +45,9 @@ export function DisclosureUpload({
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewingDisclosure, setViewingDisclosure] = useState<Disclosure | null>(
+    null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -164,6 +168,15 @@ export function DisclosureUpload({
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewingDisclosure(disclosure)}
+                  title="View document"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
                 {disclosure.downloadUrl && (
                   <Button
                     variant="ghost"
@@ -175,6 +188,7 @@ export function DisclosureUpload({
                       href={disclosure.downloadUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      title="Download document"
                     >
                       <Download className="h-4 w-4" />
                     </a>
@@ -201,6 +215,18 @@ export function DisclosureUpload({
         <p className="text-sm text-muted-foreground text-center py-4">
           No disclosure documents uploaded yet
         </p>
+      )}
+
+      {viewingDisclosure && (
+        <DisclosureViewer
+          offerId={offerId}
+          disclosureId={viewingDisclosure.id}
+          fileName={viewingDisclosure.fileName}
+          open={!!viewingDisclosure}
+          onOpenChange={(open) => {
+            if (!open) setViewingDisclosure(null);
+          }}
+        />
       )}
     </div>
   );

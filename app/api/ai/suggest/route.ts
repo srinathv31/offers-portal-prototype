@@ -4,7 +4,7 @@ import { generateCampaignStrategy } from "@/lib/ai/strategy";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { season, objective, targetSegment, budget, spendingGroupContext } = body;
+    const { season, objective, targetSegment, budget, spendingGroupContext, offersContext } = body;
 
     // Allow empty objective for auto-generation
     let objectiveToUse = objective || "Generate an engaging campaign for the current season";
@@ -48,6 +48,19 @@ export async function POST(request: NextRequest) {
       
       contextNote += "]";
       objectiveToUse += contextNote;
+    }
+
+    // Enhance objective with offers context if provided
+    if (offersContext && Array.isArray(offersContext) && offersContext.length > 0) {
+      const offersDetails = offersContext
+        .map((o: { name: string; type: string; vendor?: string }) => {
+          let detail = `"${o.name}" (${o.type})`;
+          if (o.vendor) detail += ` from ${o.vendor}`;
+          return detail;
+        })
+        .join(", ");
+
+      objectiveToUse += `\n\n[Context: Campaign will include these pre-selected offers: ${offersDetails}. Generate a campaign strategy that complements these offers with appropriate name, segments, channels, and timeline. Do NOT suggest additional offers in recommendedOffers since the user has already chosen their offers.]`;
     }
 
     const suggestion = await generateCampaignStrategy({

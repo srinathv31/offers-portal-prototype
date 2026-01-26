@@ -137,53 +137,51 @@ export function OfferCard({
             </p>
           )}
 
-          {!selectable && (
-            <div className="pt-2 border-t space-y-1.5">
-              {campaignCount > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Used in {campaignCount} campaign{campaignCount !== 1 ? "s" : ""}
-                </p>
+          <div className="pt-2 border-t space-y-1.5">
+            {!selectable && campaignCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Used in {campaignCount} campaign{campaignCount !== 1 ? "s" : ""}
+              </p>
+            )}
+            <div className="flex items-center justify-between">
+              {disclosureCount > 0 ? (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5 text-green-600" />
+                  {disclosureCount} disclosure{disclosureCount !== 1 ? "s" : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                  <FileText className="h-3.5 w-3.5" />
+                  No disclosure
+                </span>
               )}
-              <div className="flex items-center justify-between">
-                {disclosureCount > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <FileText className="h-3.5 w-3.5 text-green-600" />
-                    {disclosureCount} disclosure{disclosureCount !== 1 ? "s" : ""}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-                    <FileText className="h-3.5 w-3.5" />
-                    No disclosure
-                  </span>
-                )}
-                {disclosureCount === 0 && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.docx,.txt,.md"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs gap-1"
-                      onClick={handleUploadClick}
-                      disabled={uploading}
-                    >
-                      {uploading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Upload className="h-3 w-3" />
-                      )}
-                      {uploading ? "Uploading..." : "Upload"}
-                    </Button>
-                  </>
-                )}
-              </div>
+              {!selectable && disclosureCount === 0 && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.docx,.txt,.md"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs gap-1"
+                    onClick={handleUploadClick}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                    {uploading ? "Uploading..." : "Upload"}
+                  </Button>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>

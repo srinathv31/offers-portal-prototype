@@ -2,7 +2,57 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { offerDisclosures } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { deleteFile } from "@/lib/supabase/storage";
+import { deleteFile, downloadFileAsBuffer, getSignedUrl } from "@/lib/supabase/storage";
+import { extractTextFromFile } from "@/lib/supabase/extract-text";
+
+export async function GET(
+  _request: NextRequest,
+  {
+    params,
+  }: { params: Promise<{ id: string; disclosureId: string }> }
+) {
+  const { id: offerId, disclosureId } = await params;
+
+  try {
+    const disclosure = await db.query.offerDisclosures.findFirst({
+      where: (d, { eq, and }) =>
+        and(eq(d.id, disclosureId), eq(d.offerId, offerId)),
+    });
+
+    if (!disclosure) {
+      return NextResponse.json(
+        { error: "Disclosure not found" },
+        { status: 404 }
+      );
+    }
+
+    // For PDFs, return a signed URL so the browser can render it in an iframe
+    if (disclosure.mimeType === "application/pdf") {
+      const signedUrl = await getSignedUrl(disclosure.storagePath);
+      return NextResponse.json({
+        type: "pdf",
+        url: signedUrl,
+        fileName: disclosure.fileName,
+      });
+    }
+
+    // For text-based files, extract and return the content
+    const buffer = await downloadFileAsBuffer(disclosure.storagePath);
+    const text = await extractTextFromFile(buffer, disclosure.mimeType);
+
+    return NextResponse.json({
+      type: disclosure.mimeType === "text/markdown" ? "markdown" : "text",
+      content: text,
+      fileName: disclosure.fileName,
+    });
+  } catch (error) {
+    console.error("Error fetching disclosure content:", error);
+    return NextResponse.json(
+      { error: "Failed to load disclosure content" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   _request: NextRequest,
