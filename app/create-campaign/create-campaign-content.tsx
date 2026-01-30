@@ -34,6 +34,7 @@ import type { StrategySuggestion } from "@/lib/ai/types";
 import type { OfferType, SegmentSource } from "@/lib/db/schema";
 import { getCurrentSeason } from "@/lib/ai/strategy";
 import { OfferCard } from "@/components/offer-card";
+import { DisclosurePreviewStep } from "@/components/disclosure-preview-step";
 
 // Spending group context interface
 interface SpendingGroupContext {
@@ -56,8 +57,13 @@ interface SpendingGroupContext {
   }>;
 }
 
-type Step = "choice" | "input" | "suggestion" | "manual";
+type Step = "choice" | "input" | "suggestion" | "disclosure" | "manual";
 type WorkflowMode = "ai-assisted" | "manual" | null;
+
+interface OfferDisclosure {
+  id: string;
+  fileName: string;
+}
 
 interface Offer {
   id: string;
@@ -65,6 +71,7 @@ interface Offer {
   type: OfferType;
   vendor: string | null;
   parameters: Record<string, unknown>;
+  disclosures?: OfferDisclosure[];
 }
 
 export function CreateCampaignPageContent() {
@@ -102,6 +109,10 @@ export function CreateCampaignPageContent() {
   // Pre-selected offers context (from /offers page)
   const [preSelectedOffers, setPreSelectedOffers] = useState<Offer[]>([]);
   const [loadingPreSelectedOffers, setLoadingPreSelectedOffers] = useState(false);
+
+  // Disclosure preview state
+  const [generatedDisclosure, setGeneratedDisclosure] = useState<string | null>(null);
+  const [disclosureSourceOfferIds, setDisclosureSourceOfferIds] = useState<string[]>([]);
 
   // Format currency helper
   const formatCurrency = (cents: number): string => {
@@ -352,7 +363,12 @@ export function CreateCampaignPageContent() {
     );
   };
 
-  const handleCreateCampaign = async () => {
+  const handleDisclosureGenerated = (content: string, sourceOfferIds: string[]) => {
+    setGeneratedDisclosure(content);
+    setDisclosureSourceOfferIds(sourceOfferIds);
+  };
+
+  const handleCreateCampaignWithDisclosure = async () => {
     setLoading(true);
     setError(null);
 
@@ -361,13 +377,18 @@ export function CreateCampaignPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: campaignName,
-          purpose: campaignPurpose,
+          name: campaignName || suggestion?.nameHint,
+          purpose: campaignPurpose || suggestion?.purposeHint,
           suggestion,
           offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
           segmentIds:
             spendingGroupSegmentIds.length > 0
               ? spendingGroupSegmentIds
+              : undefined,
+          disclosureContent: generatedDisclosure || undefined,
+          disclosureSourceOfferIds:
+            disclosureSourceOfferIds.length > 0
+              ? disclosureSourceOfferIds
               : undefined,
         }),
       });
@@ -596,41 +617,69 @@ export function CreateCampaignPageContent() {
         {/* Step Indicator (only show for AI-assisted workflow) */}
         {workflowMode === "ai-assisted" && step !== "choice" && (
           <div className="mb-8">
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center">
+              {/* Step 1: Campaign Details */}
               <div
                 className={`flex items-center gap-2 ${
-                  step === "input" ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                    step === "input"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-muted"
-                  }`}
-                >
-                  1
-                </div>
-                <span className="text-sm font-medium">Input</span>
-              </div>
-              <Separator className="w-16" />
-              <div
-                className={`flex items-center gap-2 ${
-                  step === "suggestion"
+                  step === "input" || step === "suggestion"
                     ? "text-primary"
                     : "text-muted-foreground"
                 }`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                    step === "suggestion"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium ${
+                    step === "input" || step === "suggestion"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : step === "disclosure"
+                        ? "border-primary bg-primary/20 text-primary"
+                        : "border-muted"
+                  }`}
+                >
+                  1
+                </div>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Campaign Details
+                </span>
+              </div>
+
+              {/* Connector line */}
+              <div className="w-8 sm:w-12 h-px bg-border mx-2" />
+
+              {/* Step 2: Disclosures */}
+              <div
+                className={`flex items-center gap-2 ${
+                  step === "disclosure"
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium ${
+                    step === "disclosure"
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-muted"
                   }`}
                 >
                   2
                 </div>
-                <span className="text-sm font-medium">AI Suggestion</span>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Disclosures
+                </span>
+              </div>
+
+              {/* Connector line */}
+              <div className="w-8 sm:w-12 h-px bg-border mx-2" />
+
+              {/* Step 3: Submit */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium border-muted`}
+                >
+                  3
+                </div>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Submit
+                </span>
               </div>
             </div>
           </div>
@@ -754,6 +803,7 @@ export function CreateCampaignPageContent() {
                         type={offer.type}
                         vendor={offer.vendor}
                         parameters={offer.parameters}
+                        disclosureCount={offer.disclosures?.length ?? 0}
                         selectable
                         selected={selectedOfferIds.includes(offer.id)}
                         onSelect={toggleOfferSelection}
@@ -1114,6 +1164,7 @@ export function CreateCampaignPageContent() {
                             type={offer.type}
                             vendor={offer.vendor}
                             parameters={offer.parameters}
+                            disclosureCount={offer.disclosures?.length ?? 0}
                             selectable
                             selected={selectedOfferIds.includes(offer.id)}
                             onSelect={toggleOfferSelection}
@@ -1152,24 +1203,36 @@ export function CreateCampaignPageContent() {
                 Refine Inputs
               </Button>
               <Button
-                onClick={handleCreateCampaign}
+                onClick={() => setStep("disclosure")}
                 disabled={loading}
                 className="gap-2 flex-1"
               >
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Creating Campaign...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Accept & Create Campaign
+                    Continue to Disclosure Preview
                   </>
                 )}
               </Button>
             </div>
           </div>
+        )}
+
+        {/* Step 3: Disclosure Preview */}
+        {step === "disclosure" && (
+          <DisclosurePreviewStep
+            offerIds={selectedOfferIds}
+            campaignName={campaignName || suggestion?.nameHint || "Campaign"}
+            onDisclosureGenerated={handleDisclosureGenerated}
+            onBack={() => setStep("suggestion")}
+            onCreateCampaign={handleCreateCampaignWithDisclosure}
+            loading={loading}
+          />
         )}
       </div>
     </div>

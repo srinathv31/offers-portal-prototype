@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { offerDisclosures, offers } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { offerDisclosures, documents } from "@/lib/db/schema";
 import { uploadFile, getSignedUrl } from "@/lib/supabase/storage";
 
 export async function POST(
@@ -44,7 +43,7 @@ export async function POST(
       );
     }
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage — offer folder
     const { path, error: uploadError } = await uploadFile(
       file,
       `offers/${offerId}`
@@ -57,7 +56,27 @@ export async function POST(
       );
     }
 
-    // Insert metadata row
+    // Also upload to documents/ folder and create a library entry
+    const { path: docPath, error: docUploadError } = await uploadFile(
+      file,
+      "documents"
+    );
+
+    let documentId: string | null = null;
+    if (!docUploadError && docPath) {
+      const [doc] = await db
+        .insert(documents)
+        .values({
+          fileName: file.name,
+          storagePath: docPath,
+          mimeType: file.type,
+          fileSize: file.size,
+        })
+        .returning();
+      documentId = doc.id;
+    }
+
+    // Insert offer disclosure metadata row
     const [disclosure] = await db
       .insert(offerDisclosures)
       .values({
@@ -66,6 +85,7 @@ export async function POST(
         storagePath: path,
         mimeType: file.type,
         fileSize: file.size,
+        documentId,
       })
       .returning();
 

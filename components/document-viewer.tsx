@@ -11,9 +11,8 @@ import {
 import { Loader2, FileText } from "lucide-react";
 import { MarkdownContent } from "@/components/markdown-renderer";
 
-interface DisclosureViewerProps {
-  offerId: string;
-  disclosureId: string;
+interface DocumentViewerProps {
+  documentId: string;
   fileName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,21 +26,18 @@ type ContentState =
   | { status: "loaded"; type: "text" | "markdown"; content: string }
   | { status: "loaded"; type: "html"; content: string };
 
-export function DisclosureViewer({
-  offerId,
-  disclosureId,
+export function DocumentViewer({
+  documentId,
   fileName,
   open,
   onOpenChange,
-}: DisclosureViewerProps) {
+}: DocumentViewerProps) {
   const [state, setState] = useState<ContentState>({ status: "idle" });
 
   const fetchContent = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const res = await fetch(
-        `/api/offers/${offerId}/disclosures/${disclosureId}`
-      );
+      const res = await fetch(`/api/documents/${documentId}/content`);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to load");
@@ -62,8 +58,9 @@ export function DisclosureViewer({
         message: err instanceof Error ? err.message : "Failed to load",
       });
     }
-  }, [offerId, disclosureId]);
+  }, [documentId]);
 
+  // Fetch content when the dialog opens (including initial mount with open=true)
   useEffect(() => {
     if (open) {
       fetchContent();
@@ -84,7 +81,7 @@ export function DisclosureViewer({
             <FileText className="h-5 w-5 flex-shrink-0" />
             <span className="truncate">{fileName}</span>
           </DialogTitle>
-          <DialogDescription>Disclosure document preview</DialogDescription>
+          <DialogDescription>Document preview</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-auto">

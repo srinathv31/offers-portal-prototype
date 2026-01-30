@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
 
@@ -575,6 +575,36 @@ export async function getAccountsWithTransactionsForCampaign(
 // ==========================================
 // DISCLOSURE HELPERS
 // ==========================================
+
+// ==========================================
+// DOCUMENT HELPERS
+// ==========================================
+
+export async function getAllDocuments() {
+  return db.query.documents.findMany({
+    with: {
+      offerDisclosures: {
+        with: {
+          offer: true,
+        },
+      },
+    },
+    orderBy: (d, { desc }) => [desc(d.createdAt)],
+  });
+}
+
+export async function getDocumentById(documentId: string) {
+  return db.query.documents.findFirst({
+    where: (d, { eq }) => eq(d.id, documentId),
+    with: {
+      offerDisclosures: {
+        with: {
+          offer: true,
+        },
+      },
+    },
+  });
+}
 
 export async function getOfferDisclosures(offerId: string) {
   return db.query.offerDisclosures.findMany({

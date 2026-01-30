@@ -417,6 +417,18 @@ export const auditLogs = pgTable("audit_logs", {
 // DISCLOSURE TABLES
 // ==========================================
 
+// Documents - Centralized document library
+export const documents = pgTable("documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileName: text("file_name").notNull(),
+  storagePath: text("storage_path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Offer Disclosures - Metadata for files uploaded to Supabase Storage
 export const offerDisclosures = pgTable("offer_disclosures", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -427,6 +439,9 @@ export const offerDisclosures = pgTable("offer_disclosures", {
   storagePath: text("storage_path").notNull(),
   mimeType: text("mime_type").notNull(),
   fileSize: integer("file_size").notNull(),
+  documentId: uuid("document_id").references(() => documents.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -693,6 +708,11 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
 }));
 
+// Document relations
+export const documentsRelations = relations(documents, ({ many }) => ({
+  offerDisclosures: many(offerDisclosures),
+}));
+
 // Disclosure relations
 export const offerDisclosuresRelations = relations(
   offerDisclosures,
@@ -700,6 +720,10 @@ export const offerDisclosuresRelations = relations(
     offer: one(offers, {
       fields: [offerDisclosures.offerId],
       references: [offers.id],
+    }),
+    document: one(documents, {
+      fields: [offerDisclosures.documentId],
+      references: [documents.id],
     }),
   })
 );

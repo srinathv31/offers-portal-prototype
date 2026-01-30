@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OfferTypeBadge } from "@/components/offer-type-badge";
+import { DocumentLinkDialog } from "@/components/document-link-dialog";
 import type { OfferType } from "@/lib/db/schema";
-import { CheckCircle2, FileText, Upload, Loader2 } from "lucide-react";
+import { CheckCircle2, FileText, Link2 } from "lucide-react";
 
 interface OfferCardProps {
   id: string;
@@ -36,8 +37,7 @@ export function OfferCard({
   onSelect,
   onDisclosureUploaded,
 }: OfferCardProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   const handleClick = () => {
     if (selectable && onSelect) {
@@ -45,41 +45,10 @@ export function OfferCard({
     }
   };
 
-  const handleUploadClick = (e: React.MouseEvent) => {
+  const handleLinkClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`/api/offers/${id}/disclosures`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        onDisclosureUploaded?.();
-      } else {
-        const data = await res.json();
-        console.error("Upload failed:", data.error);
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-    } finally {
-      setUploading(false);
-      // Reset file input so the same file can be re-selected
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
+    setLinkDialogOpen(true);
   };
 
   const content = (
@@ -156,29 +125,15 @@ export function OfferCard({
                 </span>
               )}
               {!selectable && disclosureCount === 0 && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.docx,.txt,.md"
-                    onChange={handleFileChange}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs gap-1"
-                    onClick={handleUploadClick}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Upload className="h-3 w-3" />
-                    )}
-                    {uploading ? "Uploading..." : "Upload"}
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1"
+                  onClick={handleLinkClick}
+                >
+                  <Link2 className="h-3 w-3" />
+                  Link
+                </Button>
               )}
             </div>
           </div>
@@ -191,6 +146,16 @@ export function OfferCard({
     return content;
   }
 
-  return <Link href={`/offers/${id}`}>{content}</Link>;
+  return (
+    <>
+      <Link href={`/offers/${id}`}>{content}</Link>
+      <DocumentLinkDialog
+        offerId={id}
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        onLinked={() => onDisclosureUploaded?.()}
+      />
+    </>
+  );
 }
 

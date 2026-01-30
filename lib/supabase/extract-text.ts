@@ -1,6 +1,11 @@
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
+export async function extractHtmlFromDocx(buffer: Buffer): Promise<string> {
+  const result = await mammoth.convertToHtml({ buffer });
+  return result.value;
+}
+
 export async function extractTextFromFile(
   buffer: Buffer,
   mimeType: string

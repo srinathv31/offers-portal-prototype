@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { offerDisclosures } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { deleteFile, downloadFileAsBuffer, getSignedUrl } from "@/lib/supabase/storage";
-import { extractTextFromFile } from "@/lib/supabase/extract-text";
+import { extractTextFromFile, extractHtmlFromDocx } from "@/lib/supabase/extract-text";
 
 export async function GET(
   _request: NextRequest,
@@ -36,12 +36,25 @@ export async function GET(
       });
     }
 
+    // For DOCX files, convert to HTML to preserve formatting and images
+    const DOCX_MIME =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    if (disclosure.mimeType === DOCX_MIME) {
+      const buffer = await downloadFileAsBuffer(disclosure.storagePath);
+      const html = await extractHtmlFromDocx(buffer);
+      return NextResponse.json({
+        type: "html",
+        content: html,
+        fileName: disclosure.fileName,
+      });
+    }
+
     // For text-based files, extract and return the content
     const buffer = await downloadFileAsBuffer(disclosure.storagePath);
     const text = await extractTextFromFile(buffer, disclosure.mimeType);
 
     return NextResponse.json({
-      type: disclosure.mimeType === "text/markdown" ? "markdown" : "text",
+      type: "markdown",
       content: text,
       fileName: disclosure.fileName,
     });

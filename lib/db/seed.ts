@@ -40,9 +40,10 @@ async function clearDatabase() {
   await db.delete(schema.accountCreditCards);
   await db.delete(schema.creditCards);
 
-  // Clear disclosure data
+  // Clear disclosure data (offerDisclosures references documents via FK)
   await db.delete(schema.campaignDisclosures);
   await db.delete(schema.offerDisclosures);
+  await db.delete(schema.documents);
 
   // Clear campaign data (before spending groups since simulation_runs references spending_groups)
   await db.delete(schema.auditLogs);
@@ -85,6 +86,7 @@ function printSummary(data: {
   enrollments: { length: number };
   transactions: { length: number };
   disclosures: { length: number };
+  documents: { length: number };
 }) {
   const avgTransactionsPerAccount = Math.round(
     data.transactions.length / data.accounts.length
@@ -110,6 +112,7 @@ function printSummary(data: {
   console.log(`  Avg Tx/Account:      ${avgTransactionsPerAccount}`);
   console.log("━".repeat(50));
   console.log(`  Disclosures:         ${data.disclosures.length}`);
+  console.log(`  Documents:           ${data.documents.length}`);
   console.log("━".repeat(50));
   console.log("\n🎯 Ready for demo!");
   console.log("   - Confidence distribution: 80% HIGH, 15% MEDIUM, 5% LOW");
@@ -145,7 +148,7 @@ async function seed() {
   const plans = await seedPlans();
 
   // Seed disclosure documents (depends on offers, uploads to Supabase Storage)
-  const disclosures = await seedDisclosures(offers);
+  const { disclosures, documents } = await seedDisclosures(offers);
 
   // Seed campaigns (depends on offers, segments, rules, plans)
   const campaigns = await seedCampaigns({
@@ -213,6 +216,7 @@ async function seed() {
     enrollments,
     transactions,
     disclosures,
+    documents,
   });
 
   console.log(`\n⏱️  Completed in ${duration}s`);

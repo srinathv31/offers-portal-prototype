@@ -2,9 +2,10 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, Trash2, Download, Loader2, Eye } from "lucide-react";
+import { FileText, Upload, Trash2, Download, Loader2, Eye, Link2 } from "lucide-react";
 import { format } from "date-fns";
 import { DisclosureViewer } from "@/components/disclosure-viewer";
+import { DocumentLinkDialog } from "@/components/document-link-dialog";
 
 interface Disclosure {
   id: string;
@@ -48,7 +49,20 @@ export function DisclosureUpload({
   const [viewingDisclosure, setViewingDisclosure] = useState<Disclosure | null>(
     null
   );
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function refreshDisclosures() {
+    try {
+      const listRes = await fetch(`/api/offers/${offerId}/disclosures`);
+      if (listRes.ok) {
+        const updated = await listRes.json();
+        setDisclosures(updated);
+      }
+    } catch {
+      // silently fail
+    }
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -72,11 +86,7 @@ export function DisclosureUpload({
       }
 
       // Refresh the list with signed URLs
-      const listRes = await fetch(`/api/offers/${offerId}/disclosures`);
-      if (listRes.ok) {
-        const updated = await listRes.json();
-        setDisclosures(updated);
-      }
+      await refreshDisclosures();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -136,6 +146,15 @@ export function DisclosureUpload({
             <Upload className="h-4 w-4" />
           )}
           {uploading ? "Uploading..." : "Upload Document"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => setLinkDialogOpen(true)}
+        >
+          <Link2 className="h-4 w-4" />
+          Link from Library
         </Button>
         <span className="text-xs text-muted-foreground">
           PDF, DOCX, TXT, or MD
@@ -228,6 +247,13 @@ export function DisclosureUpload({
           }}
         />
       )}
+
+      <DocumentLinkDialog
+        offerId={offerId}
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        onLinked={refreshDisclosures}
+      />
     </div>
   );
 }
