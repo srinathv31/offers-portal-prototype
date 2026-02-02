@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { db } from "../index";
 import * as schema from "../schema";
 import {
@@ -24,6 +24,72 @@ const BUCKET = "disclosures";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/**
+ * Clear all existing files from the disclosures bucket before seeding.
+ * Recursively lists and deletes files in all folders.
+ */
+async function clearDisclosureStorage(supabase: SupabaseClient) {
+  console.log("Clearing existing disclosure files from storage...");
+
+  const { data: files, error: listError } = await supabase.storage
+    .from(BUCKET)
+    .list("", { limit: 1000 });
+
+  if (listError) {
+    console.log(`⚠ Could not list storage files: ${listError.message}`);
+    return;
+  }
+
+  if (!files || files.length === 0) {
+    console.log("  No existing files to clear");
+    return;
+  }
+
+  // Recursively list and delete files in folders (offers/, documents/)
+  const allPaths: string[] = [];
+
+  for (const item of files) {
+    if (item.id === null) {
+      // It's a folder - list contents
+      const { data: folderFiles } = await supabase.storage
+        .from(BUCKET)
+        .list(item.name, { limit: 1000 });
+
+      if (folderFiles) {
+        for (const file of folderFiles) {
+          if (file.id === null) {
+            // Nested folder (e.g., offers/{offerId}/)
+            const { data: nestedFiles } = await supabase.storage
+              .from(BUCKET)
+              .list(`${item.name}/${file.name}`, { limit: 1000 });
+            if (nestedFiles) {
+              allPaths.push(
+                ...nestedFiles.map((f) => `${item.name}/${file.name}/${f.name}`)
+              );
+            }
+          } else {
+            allPaths.push(`${item.name}/${file.name}`);
+          }
+        }
+      }
+    } else {
+      allPaths.push(item.name);
+    }
+  }
+
+  if (allPaths.length > 0) {
+    const { error: deleteError } = await supabase.storage
+      .from(BUCKET)
+      .remove(allPaths);
+
+    if (deleteError) {
+      console.log(`⚠ Failed to delete files: ${deleteError.message}`);
+    } else {
+      console.log(`  ✓ Cleared ${allPaths.length} files from storage`);
+    }
+  }
+}
 
 /**
  * Structured disclosure content for 4 of the 8 seeded offers.
@@ -704,6 +770,10 @@ export async function seedDisclosures(
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Clear existing files before uploading new ones
+  await clearDisclosureStorage(supabase);
+
   const createdDisclosures: (typeof schema.offerDisclosures.$inferInsert)[] = [];
   const createdDocuments: (typeof schema.documents.$inferInsert)[] = [];
 
