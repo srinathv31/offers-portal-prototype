@@ -16,6 +16,7 @@ import { AccountTierBadge } from "@/components/account-tier-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -131,7 +132,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
                   Run E2E Test
                 </Button>
               </form>
-              {hasSpendingGroups && (
+              {hasSpendingGroups ? (
                 <form
                   action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
                   method="POST"
@@ -141,6 +142,20 @@ async function CampaignDetailContent({ id }: { id: string }) {
                     Run Spend Stim
                   </Button>
                 </form>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button variant="outline" className="gap-2 pointer-events-none" disabled>
+                        <TrendingUp className="h-4 w-4" />
+                        Run Spend Stim
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    No spending groups linked. Add segments with spending groups to enable.
+                  </TooltipContent>
+                </Tooltip>
               )}
               {campaign.status === "IN_REVIEW" && (
                 <form
