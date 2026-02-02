@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import pdf from "pdf-parse";
 import mammoth from "mammoth";
 
 export async function extractHtmlFromDocx(buffer: Buffer): Promise<string> {
@@ -17,8 +17,7 @@ export async function extractTextFromFile(
     }
 
     case "application/pdf": {
-      const parser = new PDFParse({ data: new Uint8Array(buffer) });
-      const result = await parser.getText();
+      const result = await pdf(buffer);
       return result.text;
     }
 
