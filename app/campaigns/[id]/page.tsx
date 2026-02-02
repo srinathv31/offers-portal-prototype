@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   getCampaignWithRelations,
   getEnrollmentsByCampaign,
-  getCampaignSpendingGroups,
 } from "@/lib/db";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricKPI } from "@/components/metric-kpi";
@@ -16,7 +15,6 @@ import { AccountTierBadge } from "@/components/account-tier-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -42,10 +40,9 @@ interface PageProps {
 }
 
 async function CampaignDetailContent({ id }: { id: string }) {
-  const [campaign, enrollments, spendingGroups] = await Promise.all([
+  const [campaign, enrollments] = await Promise.all([
     getCampaignWithRelations(id),
     getEnrollmentsByCampaign(id),
-    getCampaignSpendingGroups(id),
   ]);
 
   if (!campaign) {
@@ -63,13 +60,6 @@ async function CampaignDetailContent({ id }: { id: string }) {
     projected_lift_pct?: number;
     error_rate_pct?: number;
   };
-  
-  // Check if campaign has linked spending groups for Spend Stim simulation
-  const hasSpendingGroups = spendingGroups.length > 0;
-  const totalSpendingGroupAccounts = spendingGroups.reduce(
-    (sum, sg) => sum + sg.accounts.length,
-    0
-  );
 
   // Disclosure data
   const campaignDisclosure = campaign.campaignDisclosures?.[0] ?? null;
@@ -132,31 +122,15 @@ async function CampaignDetailContent({ id }: { id: string }) {
                   Run E2E Test
                 </Button>
               </form>
-              {hasSpendingGroups ? (
-                <form
-                  action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
-                  method="POST"
-                >
-                  <Button variant="outline" className="gap-2" type="submit">
-                    <TrendingUp className="h-4 w-4" />
-                    Run Spend Stim
-                  </Button>
-                </form>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button variant="outline" className="gap-2 pointer-events-none" disabled>
-                        <TrendingUp className="h-4 w-4" />
-                        Run Spend Stim
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    No spending groups linked. Add segments with spending groups to enable.
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <form
+                action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
+                method="POST"
+              >
+                <Button variant="outline" className="gap-2" type="submit">
+                  <TrendingUp className="h-4 w-4" />
+                  Run Spend Stim
+                </Button>
+              </form>
               {campaign.status === "IN_REVIEW" && (
                 <form
                   action={`/api/campaigns/${campaign.id}/publish`}
