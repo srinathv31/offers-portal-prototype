@@ -110,6 +110,74 @@ interface DisclosureSpec {
   sections: DisclosureSection[];
 }
 
+/**
+ * Standalone DOCX disclosures uploaded to documents library only (not linked to offers).
+ * These allow demoing the "link document to offer" feature.
+ */
+const standaloneDisclosureSpecs: Omit<DisclosureSpec, "offerIndex">[] = [
+  {
+    docxFileName: "starbucks-bonus-disclosure.docx",
+    title: "OFFER DISCLOSURE: Starbucks Bonus Stars",
+    effectiveDate: "January 1, 2025",
+    offerReference: "OFR-SBUX-BONUS-2025",
+    sections: [
+      {
+        heading: "1. Bonus Details",
+        paragraphs: [
+          "Enrolled cardholders earn 500 bonus Starbucks Stars upon completing qualifying purchases at participating Starbucks locations. Stars are credited to the cardholder's linked Starbucks Rewards account within 10 business days of meeting the spending requirement.",
+        ],
+      },
+      {
+        heading: "2. Qualifying Purchases",
+        paragraphs: [
+          "Purchases must be made at Starbucks locations within the United States using the enrolled credit card. The following are considered qualifying transactions:",
+        ],
+        bullets: [
+          "In-store purchases at company-operated Starbucks retail locations",
+          "Starbucks mobile app orders paid with the enrolled card",
+          "Starbucks drive-through purchases",
+          "Purchases at Starbucks locations inside Target, grocery stores, and airports (where card payment is accepted)",
+        ],
+      },
+      {
+        heading: "3. Minimum Spend Requirement",
+        paragraphs: [
+          "A cumulative spend of $150.00 at qualifying Starbucks locations is required to earn the bonus Stars. Spend is tracked from the date of offer enrollment through the offer expiration date.",
+        ],
+      },
+      {
+        heading: "4. Stars Credit Timeline",
+        paragraphs: [
+          "Bonus Stars are credited to the linked Starbucks Rewards account within 10 business days after the spending requirement is met. If no Starbucks Rewards account is linked at the time of qualification, Stars will be held for up to 30 days pending account linkage.",
+        ],
+      },
+      {
+        heading: "5. Eligible Locations",
+        paragraphs: [
+          "This offer is valid at participating Starbucks locations in the United States. The following locations may not participate:",
+        ],
+        bullets: [
+          "Licensed locations that do not accept credit card payments directly",
+          "Starbucks kiosks in hotels, universities, or hospitals with limited payment options",
+          "International Starbucks locations, including Puerto Rico and U.S. territories",
+        ],
+      },
+      {
+        heading: "6. Progress Tracking",
+        paragraphs: [
+          "Eligible spend toward the $150.00 target is tracked automatically. Progress updates are reflected in your account within 2-3 business days of a qualifying transaction posting. Cardholders can view their progress in the offers section of their account portal.",
+        ],
+      },
+      {
+        heading: "7. General Terms",
+        paragraphs: [
+          "This offer requires a linked Starbucks Rewards account for Star delivery. The offer is non-transferable and applies only to the enrolled cardholder's primary account. Stars earned through this offer are subject to Starbucks Rewards program terms, including expiration policies. The issuer is not responsible for Starbucks Rewards program changes. This offer cannot be combined with other Starbucks-specific promotions.",
+        ],
+      },
+    ],
+  },
+];
+
 const disclosureSpecs: DisclosureSpec[] = [
   {
     offerIndex: 0,
@@ -872,6 +940,43 @@ export async function seedDisclosures(
 
     createdDocuments.push(docRow);
     console.log(`  \u2713 Library: ${doc.fileName}`);
+  }
+
+  // Seed standalone DOCX library documents (not linked to offers)
+  for (const spec of standaloneDisclosureSpecs) {
+    // Create a spec with a dummy offerIndex for type compatibility
+    const fullSpec: DisclosureSpec = { ...spec, offerIndex: -1 };
+    const docxBuffer = await generateDisclosureDocx(fullSpec);
+    const docxUint8 = new Uint8Array(docxBuffer);
+    const docxBlob = new Blob([docxUint8], { type: DOCX_MIME });
+
+    // Upload to documents/ folder only (no offers/ folder)
+    const docStoragePath = `documents/${crypto.randomUUID()}-${spec.docxFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(docStoragePath, docxBlob, { contentType: DOCX_MIME });
+
+    if (uploadError) {
+      console.log(
+        `\u26A0 Failed to upload standalone DOCX "${spec.docxFileName}": ${uploadError.message}`
+      );
+      continue;
+    }
+
+    const [docRow] = await db
+      .insert(schema.documents)
+      .values({
+        fileName: spec.docxFileName,
+        storagePath: docStoragePath,
+        mimeType: DOCX_MIME,
+        fileSize: docxBuffer.length,
+        description: `Disclosure document: ${spec.title}`,
+      })
+      .returning();
+
+    createdDocuments.push(docRow);
+    console.log(`  \u2713 Library DOCX: ${spec.docxFileName}`);
   }
 
   console.log(
