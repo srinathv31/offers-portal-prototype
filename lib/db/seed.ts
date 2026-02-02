@@ -25,6 +25,7 @@ import { seedCreditCards } from "./seed-data/credit-cards";
 import { seedSpendingGroups } from "./seed-data/spending-groups";
 import { seedEnrollments } from "./seed-data/enrollments";
 import { seedTransactions } from "./seed-data/transactions";
+import { seedDisclosures } from "./seed-data/disclosures";
 
 /**
  * Clear all existing data from the database
@@ -38,6 +39,11 @@ async function clearDatabase() {
   await db.delete(schema.accountOfferEnrollments);
   await db.delete(schema.accountCreditCards);
   await db.delete(schema.creditCards);
+
+  // Clear disclosure data (offerDisclosures references documents via FK)
+  await db.delete(schema.campaignDisclosures);
+  await db.delete(schema.offerDisclosures);
+  await db.delete(schema.documents);
 
   // Clear campaign data (before spending groups since simulation_runs references spending_groups)
   await db.delete(schema.auditLogs);
@@ -79,6 +85,8 @@ function printSummary(data: {
   spendingGroupAccountsData: { length: number };
   enrollments: { length: number };
   transactions: { length: number };
+  disclosures: { length: number };
+  documents: { length: number };
 }) {
   const avgTransactionsPerAccount = Math.round(
     data.transactions.length / data.accounts.length
@@ -103,10 +111,13 @@ function printSummary(data: {
   console.log(`  Transactions:        ${data.transactions.length}`);
   console.log(`  Avg Tx/Account:      ${avgTransactionsPerAccount}`);
   console.log("━".repeat(50));
+  console.log(`  Disclosures:         ${data.disclosures.length}`);
+  console.log(`  Documents:           ${data.documents.length}`);
+  console.log("━".repeat(50));
   console.log("\n🎯 Ready for demo!");
-  console.log("   - All accounts have 30-50 transactions for HIGH confidence projections");
+  console.log("   - Confidence distribution: 80% HIGH, 15% MEDIUM, 5% LOW");
   console.log("   - Transactions are aligned with spending group categories");
-  console.log("   - Spend Stim simulation will show improved lift projections");
+  console.log("   - Spend Stim simulation will show varied confidence levels");
 }
 
 /**
@@ -135,6 +146,9 @@ async function seed() {
 
   // Seed plans (channel, fulfillment, control checklist)
   const plans = await seedPlans();
+
+  // Seed disclosure documents (depends on offers, uploads to Supabase Storage)
+  const { disclosures, documents } = await seedDisclosures(offers);
 
   // Seed campaigns (depends on offers, segments, rules, plans)
   const campaigns = await seedCampaigns({
@@ -201,6 +215,8 @@ async function seed() {
     spendingGroupAccountsData,
     enrollments,
     transactions,
+    disclosures,
+    documents,
   });
 
   console.log(`\n⏱️  Completed in ${duration}s`);

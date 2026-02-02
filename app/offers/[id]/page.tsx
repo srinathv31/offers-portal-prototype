@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ExternalLink, TrendingUp, Pencil, Target } from "lucide-react";
+import { ArrowLeft, ExternalLink, TrendingUp, Pencil, Target, FileText } from "lucide-react";
 import { format } from "date-fns";
 import type { OfferType } from "@/lib/db/schema";
+import { getSignedUrl } from "@/lib/supabase/storage";
+import { DisclosureUpload } from "@/components/disclosure-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -213,6 +215,36 @@ async function OfferDetailContent({ id }: { id: string }) {
             </CardContent>
           </Card>
         )}
+
+        {/* Disclosure Documents */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Disclosure Documents</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <DisclosureUpload
+              offerId={offer.id}
+              initialDisclosures={await Promise.all(
+                (offer.disclosures || []).map(async (d) => {
+                  let downloadUrl: string | null = null;
+                  try {
+                    downloadUrl = await getSignedUrl(d.storagePath);
+                  } catch {
+                    // ignore signing errors
+                  }
+                  return {
+                    ...d,
+                    createdAt: d.createdAt.toISOString(),
+                    downloadUrl,
+                  };
+                })
+              )}
+            />
+          </CardContent>
+        </Card>
 
         {/* Campaign Lineage */}
         <Card>

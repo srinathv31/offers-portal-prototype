@@ -1,8 +1,11 @@
 /**
  * Seed transactions with realistic spending patterns
  *
- * Generates 30-50 transactions per account over the last 90 days,
- * aligned with the account's spending group categories.
+ * Generates transactions over the last 90 days with varied counts
+ * to produce a confidence level distribution for Spend Stim simulations:
+ * - 80% HIGH confidence (25-55 transactions)
+ * - 15% MEDIUM confidence (10-17 transactions)
+ * - 5% LOW confidence (2-6 transactions)
  */
 
 import { faker } from "@faker-js/faker";
@@ -59,9 +62,25 @@ interface SeedTransactionsDeps {
   groupAssignments: Map<string, SpendingGroupAssignment[]>;
 }
 
+type ConfidenceTier = "HIGH" | "MEDIUM" | "LOW";
+
+/**
+ * Deterministically assign confidence tier based on account position
+ * Distribution: 80% HIGH, 15% MEDIUM, 5% LOW
+ */
+function getConfidenceTierForAccount(
+  accountIndex: number,
+  totalAccounts: number
+): ConfidenceTier {
+  const position = accountIndex / totalAccounts;
+  if (position < 0.8) return "HIGH";
+  if (position < 0.95) return "MEDIUM";
+  return "LOW";
+}
+
 /**
  * Seed account transactions with offer qualification metadata
- * Generates 30-50 transactions per account aligned with spending groups
+ * Transaction counts vary by confidence tier (80% HIGH, 15% MEDIUM, 5% LOW)
  */
 export async function seedTransactions(deps: SeedTransactionsDeps) {
   const { accounts, enrollments, offers, accountCreditCardsData, groupAssignments } =
@@ -133,18 +152,33 @@ export async function seedTransactions(deps: SeedTransactionsDeps) {
   }> = [];
 
   // Generate transactions for each account
-  for (const account of accounts) {
-    // Determine transaction count (30-50, influenced by tier)
-    const baseCount = faker.number.int({ min: 30, max: 50 });
-    const tierBonus =
-      account.tier === "DIAMOND"
-        ? 10
-        : account.tier === "PLATINUM"
-        ? 5
-        : account.tier === "GOLD"
-        ? 2
-        : 0;
-    const transactionCount = baseCount + tierBonus;
+  for (let accountIndex = 0; accountIndex < accounts.length; accountIndex++) {
+    const account = accounts[accountIndex];
+
+    // Determine confidence tier for this account (80% HIGH, 15% MEDIUM, 5% LOW)
+    const confidenceTier = getConfidenceTierForAccount(accountIndex, accounts.length);
+
+    // Generate transaction count based on confidence tier
+    let transactionCount: number;
+    if (confidenceTier === "HIGH") {
+      // 20+ transactions for HIGH confidence
+      const baseCount = faker.number.int({ min: 25, max: 45 });
+      const tierBonus =
+        account.tier === "DIAMOND"
+          ? 10
+          : account.tier === "PLATINUM"
+          ? 5
+          : account.tier === "GOLD"
+          ? 2
+          : 0;
+      transactionCount = baseCount + tierBonus;
+    } else if (confidenceTier === "MEDIUM") {
+      // 8-19 transactions for MEDIUM confidence
+      transactionCount = faker.number.int({ min: 10, max: 17 });
+    } else {
+      // 0-7 transactions for LOW confidence
+      transactionCount = faker.number.int({ min: 2, max: 6 });
+    }
 
     // Get merchants based on spending group membership
     const groupMerchants = getMerchantsForAccount(account.id, groupAssignments);

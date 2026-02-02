@@ -45,6 +45,110 @@ export function getCurrentSeason(): string {
 function generateMockStrategy(input: StrategyInput): StrategySuggestion {
   const { season, objective } = input;
 
+  // Check if there's offers context in the objective
+  const hasOffersContext = objective?.includes("[Context: Campaign will include these pre-selected offers:");
+
+  if (hasOffersContext) {
+    // Extract offer names from context
+    const offersMatch = objective?.match(
+      /\[Context: Campaign will include these pre-selected offers: (.+?)\. Generate/
+    );
+    const offersText = offersMatch ? offersMatch[1] : "";
+
+    // Extract individual offer names
+    const offerNames = offersText
+      .split(",")
+      .map((s) => {
+        const nameMatch = s.trim().match(/"([^"]+)"/);
+        return nameMatch ? nameMatch[1] : s.trim();
+      })
+      .filter(Boolean);
+
+    // Detect offer types from context
+    const hasPointsMultiplier = offersText.includes("POINTS_MULTIPLIER");
+    const hasCashback = offersText.includes("CASHBACK");
+    const hasDiscount = offersText.includes("DISCOUNT");
+    const hasBonus = offersText.includes("BONUS");
+
+    // Build a descriptive campaign name
+    let nameHint = "";
+    if (offerNames.length === 1) {
+      nameHint = `${offerNames[0]} Campaign`;
+    } else if (offerNames.length <= 3) {
+      nameHint = `${offerNames.join(" & ")} Campaign`;
+    } else {
+      nameHint = `Multi-Offer Rewards Campaign (${offerNames.length} Offers)`;
+    }
+
+    // Build purpose
+    const offerTypesList: string[] = [];
+    if (hasPointsMultiplier) offerTypesList.push("points multipliers");
+    if (hasCashback) offerTypesList.push("cashback rewards");
+    if (hasDiscount) offerTypesList.push("discounts");
+    if (hasBonus) offerTypesList.push("bonus incentives");
+    const typesDesc =
+      offerTypesList.length > 0
+        ? offerTypesList.join(", ")
+        : "targeted rewards";
+
+    const purposeHint = `Drive customer engagement and spending through ${typesDesc} across ${offerNames.length} curated offer${offerNames.length !== 1 ? "s" : ""}: ${offerNames.join(", ")}`;
+
+    // Determine segments based on offer types
+    const segments = [];
+    if (hasPointsMultiplier || hasCashback) {
+      segments.push({
+        name: "Active Card Users",
+        source: "CDC" as const,
+        criteria: "Monthly spend >$1000, active in past 90 days",
+      });
+    }
+    if (hasDiscount || hasBonus) {
+      segments.push({
+        name: "Growth Opportunity",
+        source: "RAHONA" as const,
+        criteria:
+          "Customers with below-average engagement who respond well to incentives",
+      });
+    }
+    segments.push({
+      name: "Offer-Aligned Spenders",
+      source: "CUSTOM" as const,
+      criteria: `Customers whose spending patterns match the selected offer categories`,
+    });
+
+    // Timeline
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() + 7);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 45);
+    const formatDate = (date: Date) => date.toISOString().split("T")[0];
+
+    return {
+      nameHint,
+      purposeHint,
+      recommendedOffers: [], // User already selected their offers
+      segments,
+      channels: ["EMAIL", "MOBILE", "WEB"] as ("EMAIL" | "MOBILE" | "WEB")[],
+      timelines: {
+        recommendedStart: formatDate(startDate),
+        recommendedEnd: formatDate(endDate),
+        rationale: `45-day campaign to maximize engagement with the ${offerNames.length} selected offer${offerNames.length !== 1 ? "s" : ""}. Start in 1 week to allow for setup and communications.`,
+      },
+      notes: [
+        `Campaign built around ${offerNames.length} pre-selected offer${offerNames.length !== 1 ? "s" : ""}: ${offerNames.join(", ")}`,
+        "Consider staggering offer activation to sustain engagement throughout the campaign",
+        "Monitor per-offer performance to identify top performers for future campaigns",
+      ],
+      vendorHintsByOfferType: {
+        CASHBACK: ["Based on selected offers"],
+        POINTS_MULTIPLIER: ["Based on selected offers"],
+        DISCOUNT: ["Based on selected offers"],
+        BONUS: ["Based on selected offers"],
+      },
+    };
+  }
+
   // Check if there's spending group context in the objective
   const hasSpendingGroupContext = objective?.includes("[Context: Targeting the");
   let spendingGroupName = "";

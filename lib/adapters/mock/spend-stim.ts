@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { db, getAccountsWithTransactionsForCampaign } from "@/lib/db";
+import { db, getAccountsForCampaignOffers } from "@/lib/db";
 import {
   simulationRuns,
   type AccountProjection,
@@ -55,7 +55,7 @@ const SPEND_STIM_STEPS: Array<{
   label: string;
   duration: number;
 }> = [
-  { key: "spending-group-analysis", label: "Spending Group Analysis", duration: 1500 },
+  { key: "offer-criteria-analysis", label: "Offer Criteria Analysis", duration: 1500 },
   { key: "transaction-history", label: "Transaction History Analysis", duration: 2000 },
   { key: "baseline-calculation", label: "Baseline Calculation", duration: 1500 },
   { key: "lift-modeling", label: "Lift Modeling", duration: 2500 },
@@ -83,18 +83,21 @@ export async function startSpendStimSimulation(
 ): Promise<SpendStimSimulationRun> {
   console.log(`[SpendStim] Starting Spend Stim simulation for campaign: ${campaignId}`);
 
-  // Fetch campaign with spending groups
-  const { spendingGroups, accounts } = await getAccountsWithTransactionsForCampaign(
-    campaignId,
-    getDateNDaysAgo(90) // Last 90 days of transactions
-  );
+  // Fetch accounts based on offer criteria (enrollments + matching transactions)
+  const { accounts, offerCriteria, enrolledCount, transactionMatchCount } =
+    await getAccountsForCampaignOffers(campaignId, getDateNDaysAgo(90));
 
-  if (spendingGroups.length === 0) {
-    throw new Error(`Campaign ${campaignId} has no linked spending groups`);
+  if (offerCriteria.offers.length === 0) {
+    throw new Error(`Campaign ${campaignId} has no offers`);
+  }
+
+  if (accounts.length === 0) {
+    throw new Error(
+      `No accounts found for campaign ${campaignId} - check offer enrollments and transaction criteria`
+    );
   }
 
   const cohortSize = accounts.length;
-  const primarySpendingGroupId = spendingGroups[0]?.id || null;
 
   // Create initial simulation run with all steps pending
   const initialSteps: SimulationStep[] = SPEND_STIM_STEPS.map((step) => ({
@@ -108,10 +111,15 @@ export async function startSpendStimSimulation(
     .values({
       campaignId,
       simulationType: "SPEND_STIM",
-      spendingGroupId: primarySpendingGroupId,
+      spendingGroupId: null, // No longer using spending groups
       inputs: {
-        spendingGroupCount: spendingGroups.length,
-        accountCount: cohortSize,
+        mode: "offer-based",
+        offerCount: offerCriteria.offers.length,
+        targetedCategories: offerCriteria.categories,
+        targetedVendors: offerCriteria.vendors,
+        enrolledAccounts: enrolledCount,
+        transactionMatchAccounts: transactionMatchCount,
+        totalAccounts: cohortSize,
         analysisWindow: "90 days",
         projectionWindow: "30 days",
       },
@@ -260,9 +268,9 @@ async function progressSpendStimSimulation(
     // Perform step-specific logic
     try {
       switch (step.key) {
-        case "spending-group-analysis":
+        case "offer-criteria-analysis":
           // Validation step - already done before starting
-          console.log(`[SpendStim] Analyzed ${accounts.length} accounts`);
+          console.log(`[SpendStim] Analyzed ${accounts.length} accounts from offer criteria`);
           break;
 
         case "transaction-history":

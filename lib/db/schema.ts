@@ -413,6 +413,51 @@ export const auditLogs = pgTable("audit_logs", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
+// ==========================================
+// DISCLOSURE TABLES
+// ==========================================
+
+// Documents - Centralized document library
+export const documents = pgTable("documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileName: text("file_name").notNull(),
+  storagePath: text("storage_path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Offer Disclosures - Metadata for files uploaded to Supabase Storage
+export const offerDisclosures = pgTable("offer_disclosures", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  offerId: uuid("offer_id")
+    .notNull()
+    .references(() => offers.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  storagePath: text("storage_path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  documentId: uuid("document_id").references(() => documents.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Campaign Disclosures - AI-generated aggregated disclosure
+export const campaignDisclosures = pgTable("campaign_disclosures", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  sourceOfferIds: jsonb("source_offer_ids").default([]).$type<string[]>(),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Junction tables for many-to-many relationships
 export const campaignOffers = pgTable("campaign_offers", {
   campaignId: uuid("campaign_id")
@@ -464,6 +509,7 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   simulationRuns: many(simulationRuns),
   auditLogs: many(auditLogs),
   accountOfferEnrollments: many(accountOfferEnrollments),
+  campaignDisclosures: many(campaignDisclosures),
   channelPlan: one(channelPlans, {
     fields: [campaigns.channelPlanId],
     references: [channelPlans.id],
@@ -481,6 +527,7 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
 export const offersRelations = relations(offers, ({ many }) => ({
   campaignOffers: many(campaignOffers),
   accountOfferEnrollments: many(accountOfferEnrollments),
+  disclosures: many(offerDisclosures),
 }));
 
 export const segmentsRelations = relations(segments, ({ many }) => ({
@@ -660,3 +707,33 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     references: [campaigns.id],
   }),
 }));
+
+// Document relations
+export const documentsRelations = relations(documents, ({ many }) => ({
+  offerDisclosures: many(offerDisclosures),
+}));
+
+// Disclosure relations
+export const offerDisclosuresRelations = relations(
+  offerDisclosures,
+  ({ one }) => ({
+    offer: one(offers, {
+      fields: [offerDisclosures.offerId],
+      references: [offers.id],
+    }),
+    document: one(documents, {
+      fields: [offerDisclosures.documentId],
+      references: [documents.id],
+    }),
+  })
+);
+
+export const campaignDisclosuresRelations = relations(
+  campaignDisclosures,
+  ({ one }) => ({
+    campaign: one(campaigns, {
+      fields: [campaignDisclosures.campaignId],
+      references: [campaigns.id],
+    }),
+  })
+);

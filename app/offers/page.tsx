@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfferCard } from "@/components/offer-card";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, MousePointerClick, X, Sparkles } from "lucide-react";
 import type { OfferType } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -19,37 +20,77 @@ interface Offer {
   vendor: string | null;
   parameters: Record<string, unknown>;
   campaignOffers: Array<{ campaign: { id: string; name: string; status: string } }>;
+  disclosures: Array<{ id: string }>;
 }
 
 export default function OffersPage() {
+  const router = useRouter();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedOfferIds, setSelectedOfferIds] = useState<Set<string>>(new Set());
+
+  const fetchOffers = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (vendorFilter !== "all") params.set("vendor", vendorFilter);
+
+      const res = await fetch(`/api/offers?${params.toString()}`);
+      const data = await res.json();
+      setOffers(data);
+    } catch (error) {
+      console.error("Failed to fetch offers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOffers = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (search) params.set("search", search);
-        if (typeFilter !== "all") params.set("type", typeFilter);
-        if (vendorFilter !== "all") params.set("vendor", vendorFilter);
-
-        const res = await fetch(`/api/offers?${params.toString()}`);
-        const data = await res.json();
-        setOffers(data);
-      } catch (error) {
-        console.error("Failed to fetch offers:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const debounce = setTimeout(fetchOffers, 300);
     return () => clearTimeout(debounce);
-  }, [search, typeFilter, vendorFilter]);
+  }, [search, typeFilter, vendorFilter, fetchTrigger]);
+
+  const handleDisclosureUploaded = () => {
+    setFetchTrigger((prev) => prev + 1);
+  };
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      // Turning off selection mode — clear selections
+      setSelectedOfferIds(new Set());
+    }
+    setSelectionMode(!selectionMode);
+  };
+
+  const handleOfferSelect = (id: string) => {
+    setSelectedOfferIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedOfferIds(new Set());
+  };
+
+  const handleCreateCampaign = () => {
+    const ids = Array.from(selectedOfferIds).join(",");
+    router.push(`/create-campaign?offerIds=${ids}`);
+  };
 
   // Get unique vendors from offers
   const uniqueVendors = Array.from(
@@ -68,12 +109,22 @@ export default function OffersPage() {
                 Manage and create reusable offers for campaigns
               </p>
             </div>
-            <Link href="/create-offer">
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create New Offer
+            <div className="flex items-center gap-2">
+              <Button
+                variant={selectionMode ? "default" : "outline"}
+                className="gap-2"
+                onClick={toggleSelectionMode}
+              >
+                <MousePointerClick className="h-4 w-4" />
+                {selectionMode ? "Cancel Select" : "Select"}
               </Button>
-            </Link>
+              <Link href="/create-offer">
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create New Offer
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -137,6 +188,11 @@ export default function OffersPage() {
                 vendor={offer.vendor}
                 parameters={offer.parameters}
                 campaignCount={offer.campaignOffers.length}
+                disclosureCount={offer.disclosures?.length ?? 0}
+                selectable={selectionMode}
+                selected={selectedOfferIds.has(offer.id)}
+                onSelect={handleOfferSelect}
+                onDisclosureUploaded={handleDisclosureUploaded}
               />
             ))}
           </div>
@@ -169,7 +225,27 @@ export default function OffersPage() {
           </div>
         )}
       </div>
+
+      {/* Sticky Bottom Action Bar */}
+      {selectionMode && selectedOfferIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {selectedOfferIds.size} offer{selectedOfferIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="gap-1 text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            </div>
+            <Button onClick={handleCreateCampaign} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Create Campaign from {selectedOfferIds.size} Offer{selectedOfferIds.size !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

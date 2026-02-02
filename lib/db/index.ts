@@ -1,7 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { eq, gte, inArray, or, ilike, and } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "./schema";
+import type { AccountTier } from "./schema";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
@@ -21,7 +22,11 @@ export async function getCampaignWithRelations(campaignId: string) {
     with: {
       campaignOffers: {
         with: {
-          offer: true,
+          offer: {
+            with: {
+              disclosures: true,
+            },
+          },
         },
       },
       campaignSegments: {
@@ -42,6 +47,10 @@ export async function getCampaignWithRelations(campaignId: string) {
         orderBy: (runs, { desc }) => [desc(runs.createdAt)],
         limit: 1,
       },
+      campaignDisclosures: {
+        orderBy: (d, { desc }) => [desc(d.generatedAt)],
+        limit: 1,
+      },
     },
   });
 
@@ -57,6 +66,7 @@ export async function getOfferWithCampaigns(offerId: string) {
           campaign: true,
         },
       },
+      disclosures: true,
     },
   });
 
@@ -77,6 +87,7 @@ export async function getAllOffers(filters?: OfferFilters) {
           campaign: true,
         },
       },
+      disclosures: true,
     },
     orderBy: (offers, { desc }) => [desc(offers.createdAt)],
   });
@@ -559,5 +570,313 @@ export async function getAccountsWithTransactionsForCampaign(
   return {
     spendingGroups,
     accounts: accountsWithFilteredTransactions,
+  };
+}
+
+// ==========================================
+// DISCLOSURE HELPERS
+// ==========================================
+
+// ==========================================
+// DOCUMENT HELPERS
+// ==========================================
+
+export async function getAllDocuments() {
+  return db.query.documents.findMany({
+    with: {
+      offerDisclosures: {
+        with: {
+          offer: true,
+        },
+      },
+    },
+    orderBy: (d, { desc }) => [desc(d.createdAt)],
+  });
+}
+
+export async function getDocumentById(documentId: string) {
+  return db.query.documents.findFirst({
+    where: (d, { eq }) => eq(d.id, documentId),
+    with: {
+      offerDisclosures: {
+        with: {
+          offer: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getOfferDisclosures(offerId: string) {
+  return db.query.offerDisclosures.findMany({
+    where: (d, { eq }) => eq(d.offerId, offerId),
+    orderBy: (d, { desc }) => [desc(d.createdAt)],
+  });
+}
+
+export async function getCampaignDisclosure(campaignId: string) {
+  return db.query.campaignDisclosures.findFirst({
+    where: (d, { eq }) => eq(d.campaignId, campaignId),
+    orderBy: (d, { desc }) => [desc(d.generatedAt)],
+  });
+}
+
+export async function getDisclosuresForCampaignOffers(campaignId: string) {
+  const campaign = await db.query.campaigns.findFirst({
+    where: (c, { eq }) => eq(c.id, campaignId),
+    with: {
+      campaignOffers: {
+        with: {
+          offer: {
+            with: {
+              disclosures: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!campaign) return [];
+
+  return campaign.campaignOffers
+    .map((co) => ({
+      offer: co.offer,
+      disclosures: co.offer.disclosures,
+    }))
+    .filter((item) => item.disclosures.length > 0);
+}
+
+// ==========================================
+// OFFER-BASED ACCOUNT SELECTION HELPERS
+// ==========================================
+
+interface OfferCriteria {
+  offers: Array<{
+    id: string;
+    name: string;
+    vendor: string | null;
+    progressTarget: {
+      category?: string;
+      vendor?: string;
+    } | null;
+  }>;
+  categories: string[];
+  vendors: string[];
+}
+
+/**
+ * Get campaign's offers and extract targeting criteria (categories/vendors)
+ * Used by Spend Stim simulation to determine which accounts to analyze
+ */
+export async function getCampaignOfferCriteria(
+  campaignId: string
+): Promise<OfferCriteria> {
+  const campaign = await db.query.campaigns.findFirst({
+    where: (c, { eq }) => eq(c.id, campaignId),
+    with: {
+      campaignOffers: {
+        with: {
+          offer: true,
+        },
+      },
+    },
+  });
+
+  if (!campaign) {
+    return { offers: [], categories: [], vendors: [] };
+  }
+
+  const offers = campaign.campaignOffers.map((co) => ({
+    id: co.offer.id,
+    name: co.offer.name,
+    vendor: co.offer.vendor,
+    progressTarget: co.offer.progressTarget as {
+      category?: string;
+      vendor?: string;
+    } | null,
+  }));
+
+  // Extract categories from progressTarget
+  const categories: string[] = [];
+  const vendors: string[] = [];
+
+  for (const offer of offers) {
+    // Check progressTarget first
+    if (offer.progressTarget?.category) {
+      categories.push(offer.progressTarget.category);
+    }
+    if (offer.progressTarget?.vendor) {
+      vendors.push(offer.progressTarget.vendor);
+    }
+    // Fallback to offer.vendor if no progressTarget vendor
+    if (!offer.progressTarget?.vendor && offer.vendor) {
+      vendors.push(offer.vendor);
+    }
+  }
+
+  return {
+    offers,
+    categories: [...new Set(categories)], // deduplicate
+    vendors: [...new Set(vendors)], // deduplicate
+  };
+}
+
+interface AccountWithTransactionsForOffers {
+  id: string;
+  firstName: string;
+  lastName: string;
+  tier: AccountTier;
+  annualSpend: number;
+  accountNumber: string;
+  transactions: Array<{
+    id: string;
+    transactionDate: Date;
+    amount: number;
+    category: string;
+    merchant: string;
+  }>;
+}
+
+interface OfferBasedAccountResult {
+  accounts: AccountWithTransactionsForOffers[];
+  offerCriteria: OfferCriteria;
+  enrolledCount: number;
+  transactionMatchCount: number;
+}
+
+/**
+ * Get accounts for a campaign based on offer criteria:
+ * 1. Accounts enrolled in the campaign's offers
+ * 2. Accounts with recent transactions matching offer category/vendor criteria
+ *
+ * Used by Spend Stim simulation as a replacement for spending-group-based selection
+ */
+export async function getAccountsForCampaignOffers(
+  campaignId: string,
+  sinceDate: Date
+): Promise<OfferBasedAccountResult> {
+  // Get offer criteria
+  const offerCriteria = await getCampaignOfferCriteria(campaignId);
+
+  if (offerCriteria.offers.length === 0) {
+    return {
+      accounts: [],
+      offerCriteria,
+      enrolledCount: 0,
+      transactionMatchCount: 0,
+    };
+  }
+
+  // 1. Get accounts enrolled in this campaign
+  const enrollments = await db.query.accountOfferEnrollments.findMany({
+    where: eq(schema.accountOfferEnrollments.campaignId, campaignId),
+    with: {
+      account: {
+        with: {
+          accountTransactions: true,
+        },
+      },
+    },
+  });
+
+  const enrolledAccountIds = new Set(enrollments.map((e) => e.account.id));
+  const enrolledCount = enrolledAccountIds.size;
+
+  // 2. Get accounts with matching transactions (if we have criteria)
+  let transactionMatchAccountIds = new Set<string>();
+
+  if (offerCriteria.categories.length > 0 || offerCriteria.vendors.length > 0) {
+    // Build conditions for matching transactions
+    const conditions: ReturnType<typeof gte>[] = [
+      gte(schema.accountTransactions.transactionDate, sinceDate),
+    ];
+
+    // Category matching (exact match)
+    if (offerCriteria.categories.length > 0) {
+      const categoryMatch = inArray(
+        schema.accountTransactions.category,
+        offerCriteria.categories
+      );
+
+      // Vendor matching (partial match on merchant)
+      if (offerCriteria.vendors.length > 0) {
+        const vendorConditions = offerCriteria.vendors.map((v) =>
+          ilike(schema.accountTransactions.merchant, `%${v}%`)
+        );
+        conditions.push(or(categoryMatch, ...vendorConditions)!);
+      } else {
+        conditions.push(categoryMatch);
+      }
+    } else if (offerCriteria.vendors.length > 0) {
+      // Only vendor matching
+      const vendorConditions = offerCriteria.vendors.map((v) =>
+        ilike(schema.accountTransactions.merchant, `%${v}%`)
+      );
+      conditions.push(or(...vendorConditions)!);
+    }
+
+    const matchingTransactions = await db.query.accountTransactions.findMany({
+      where: and(...conditions),
+      columns: {
+        accountId: true,
+      },
+    });
+
+    transactionMatchAccountIds = new Set(
+      matchingTransactions.map((t) => t.accountId)
+    );
+  }
+
+  // Combine unique account IDs
+  const allAccountIds = new Set([
+    ...enrolledAccountIds,
+    ...transactionMatchAccountIds,
+  ]);
+
+  if (allAccountIds.size === 0) {
+    return {
+      accounts: [],
+      offerCriteria,
+      enrolledCount,
+      transactionMatchCount: transactionMatchAccountIds.size,
+    };
+  }
+
+  // Fetch all unique accounts with their transactions
+  const accounts = await db.query.accounts.findMany({
+    where: inArray(schema.accounts.id, Array.from(allAccountIds)),
+    with: {
+      accountTransactions: {
+        orderBy: (tx, { desc }) => [desc(tx.transactionDate)],
+      },
+    },
+  });
+
+  // Transform and filter transactions by date
+  const accountsWithFilteredTransactions: AccountWithTransactionsForOffers[] =
+    accounts.map((account) => ({
+      id: account.id,
+      firstName: account.firstName,
+      lastName: account.lastName,
+      tier: account.tier,
+      annualSpend: account.annualSpend,
+      accountNumber: account.accountNumber,
+      transactions: account.accountTransactions
+        .filter((tx) => new Date(tx.transactionDate) >= sinceDate)
+        .map((tx) => ({
+          id: tx.id,
+          transactionDate: tx.transactionDate,
+          amount: tx.amount,
+          category: tx.category,
+          merchant: tx.merchant,
+        })),
+    }));
+
+  return {
+    accounts: accountsWithFilteredTransactions,
+    offerCriteria,
+    enrolledCount,
+    transactionMatchCount: transactionMatchAccountIds.size,
   };
 }

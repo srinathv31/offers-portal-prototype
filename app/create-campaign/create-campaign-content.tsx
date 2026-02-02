@@ -27,12 +27,14 @@ import {
   Zap,
   Pencil,
   Users,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import type { StrategySuggestion } from "@/lib/ai/types";
 import type { OfferType, SegmentSource } from "@/lib/db/schema";
 import { getCurrentSeason } from "@/lib/ai/strategy";
 import { OfferCard } from "@/components/offer-card";
+import { DisclosurePreviewStep } from "@/components/disclosure-preview-step";
 
 // Spending group context interface
 interface SpendingGroupContext {
@@ -55,8 +57,13 @@ interface SpendingGroupContext {
   }>;
 }
 
-type Step = "choice" | "input" | "suggestion" | "manual";
+type Step = "choice" | "input" | "suggestion" | "disclosure" | "manual";
 type WorkflowMode = "ai-assisted" | "manual" | null;
+
+interface OfferDisclosure {
+  id: string;
+  fileName: string;
+}
 
 interface Offer {
   id: string;
@@ -64,12 +71,14 @@ interface Offer {
   type: OfferType;
   vendor: string | null;
   parameters: Record<string, unknown>;
+  disclosures?: OfferDisclosure[];
 }
 
 export function CreateCampaignPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const spendingGroupId = searchParams.get("spendingGroupId");
+  const offerIdsParam = searchParams.get("offerIds");
 
   const [step, setStep] = useState<Step>("choice");
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(null);
@@ -97,6 +106,14 @@ export function CreateCampaignPageContent() {
   const [selectedOfferIds, setSelectedOfferIds] = useState<string[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
 
+  // Pre-selected offers context (from /offers page)
+  const [preSelectedOffers, setPreSelectedOffers] = useState<Offer[]>([]);
+  const [loadingPreSelectedOffers, setLoadingPreSelectedOffers] = useState(false);
+
+  // Disclosure preview state
+  const [generatedDisclosure, setGeneratedDisclosure] = useState<string | null>(null);
+  const [disclosureSourceOfferIds, setDisclosureSourceOfferIds] = useState<string[]>([]);
+
   // Format currency helper
   const formatCurrency = (cents: number): string => {
     return new Intl.NumberFormat("en-US", {
@@ -107,11 +124,12 @@ export function CreateCampaignPageContent() {
     }).format(cents / 100);
   };
 
-  // Generate AI suggestion with spending group context
+  // Generate AI suggestion with spending group or offers context
   const triggerAISuggestion = useCallback(
     async (
       purposeOverride?: string,
-      groupContext?: SpendingGroupContext | null
+      groupContext?: SpendingGroupContext | null,
+      offersCtx?: Offer[]
     ) => {
       setLoading(true);
       setError(null);
@@ -132,6 +150,14 @@ export function CreateCampaignPageContent() {
                   criteria: groupContext.criteria,
                   segments: groupContext.segments.map((s) => s.name),
                 }
+              : undefined,
+            offersContext: offersCtx
+              ? offersCtx.map((o) => ({
+                  name: o.name,
+                  type: o.type,
+                  vendor: o.vendor,
+                  parameters: o.parameters,
+                }))
               : undefined,
           }),
         });
@@ -213,6 +239,41 @@ export function CreateCampaignPageContent() {
     fetchSpendingGroup();
   }, [spendingGroupId, triggerAISuggestion]);
 
+  // Fetch pre-selected offers if coming from offers page
+  useEffect(() => {
+    if (!offerIdsParam) return;
+
+    const fetchPreSelectedOffers = async () => {
+      setLoadingPreSelectedOffers(true);
+      try {
+        const res = await fetch(`/api/offers/by-ids?ids=${offerIdsParam}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch selected offers");
+        }
+        const data: Offer[] = await res.json();
+        setPreSelectedOffers(data);
+
+        // Pre-populate selected offer IDs
+        const ids = data.map((o) => o.id);
+        setSelectedOfferIds(ids);
+
+        // Skip choice screen and trigger AI suggestion
+        setWorkflowMode("ai-assisted");
+
+        setTimeout(() => {
+          triggerAISuggestion(undefined, null, data);
+        }, 100);
+      } catch (err) {
+        console.error("Failed to fetch pre-selected offers:", err);
+        setError("Failed to load selected offers. Please try again.");
+      } finally {
+        setLoadingPreSelectedOffers(false);
+      }
+    };
+
+    fetchPreSelectedOffers();
+  }, [offerIdsParam, triggerAISuggestion]);
+
   // Fetch available offers
   useEffect(() => {
     const fetchOffers = async () => {
@@ -251,7 +312,11 @@ export function CreateCampaignPageContent() {
   };
 
   const handleGetSuggestion = async () => {
-    await triggerAISuggestion(undefined, spendingGroupContext);
+    await triggerAISuggestion(
+      undefined,
+      spendingGroupContext,
+      preSelectedOffers.length > 0 ? preSelectedOffers : undefined
+    );
   };
 
   const handleCreateManualCampaign = async () => {
@@ -298,7 +363,12 @@ export function CreateCampaignPageContent() {
     );
   };
 
-  const handleCreateCampaign = async () => {
+  const handleDisclosureGenerated = (content: string, sourceOfferIds: string[]) => {
+    setGeneratedDisclosure(content);
+    setDisclosureSourceOfferIds(sourceOfferIds);
+  };
+
+  const handleCreateCampaignWithDisclosure = async () => {
     setLoading(true);
     setError(null);
 
@@ -307,13 +377,18 @@ export function CreateCampaignPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: campaignName,
-          purpose: campaignPurpose,
+          name: campaignName || suggestion?.nameHint,
+          purpose: campaignPurpose || suggestion?.purposeHint,
           suggestion,
           offerIds: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
           segmentIds:
             spendingGroupSegmentIds.length > 0
               ? spendingGroupSegmentIds
+              : undefined,
+          disclosureContent: generatedDisclosure || undefined,
+          disclosureSourceOfferIds:
+            disclosureSourceOfferIds.length > 0
+              ? disclosureSourceOfferIds
               : undefined,
         }),
       });
@@ -332,8 +407,8 @@ export function CreateCampaignPageContent() {
     }
   };
 
-  // Show loading state while fetching spending group
-  if (loadingSpendingGroup) {
+  // Show loading state while fetching spending group or pre-selected offers
+  if (loadingSpendingGroup || loadingPreSelectedOffers) {
     return (
       <div className="min-h-screen">
         <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -348,7 +423,7 @@ export function CreateCampaignPageContent() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                <CardTitle>Loading Spending Group...</CardTitle>
+                <CardTitle>{loadingPreSelectedOffers ? "Loading Selected Offers..." : "Loading Spending Group..."}</CardTitle>
               </div>
               <CardDescription>
                 Preparing AI-assisted campaign creation
@@ -371,13 +446,15 @@ export function CreateCampaignPageContent() {
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-6">
           <Link
-            href={spendingGroupContext ? "/spending-groups" : "/"}
+            href={preSelectedOffers.length > 0 ? "/offers" : spendingGroupContext ? "/spending-groups" : "/"}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
-            {spendingGroupContext
-              ? "Back to Spending Groups"
-              : "Back to Dashboard"}
+            {preSelectedOffers.length > 0
+              ? "Back to Offers"
+              : spendingGroupContext
+                ? "Back to Spending Groups"
+                : "Back to Dashboard"}
           </Link>
           <h1 className="text-4xl font-bold tracking-tight">
             Create New Campaign
@@ -411,12 +488,28 @@ export function CreateCampaignPageContent() {
               )}
             </div>
           )}
+          {/* Offers Context Banner */}
+          {preSelectedOffers.length > 0 && (
+            <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="flex items-center gap-2 text-sm">
+                <Tag className="h-4 w-4 text-primary" />
+                <span className="font-medium">Creating campaign with:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                {preSelectedOffers.map((offer) => (
+                  <Badge key={offer.id} variant="secondary" className="font-semibold">
+                    {offer.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Workflow Choice Screen - Only show if NOT coming from spending group */}
-        {step === "choice" && !spendingGroupContext && (
+        {/* Workflow Choice Screen - Only show if NOT coming from spending group or offers */}
+        {step === "choice" && !spendingGroupContext && preSelectedOffers.length === 0 && (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold mb-2">Choose Your Workflow</h2>
@@ -524,41 +617,69 @@ export function CreateCampaignPageContent() {
         {/* Step Indicator (only show for AI-assisted workflow) */}
         {workflowMode === "ai-assisted" && step !== "choice" && (
           <div className="mb-8">
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center">
+              {/* Step 1: Campaign Details */}
               <div
                 className={`flex items-center gap-2 ${
-                  step === "input" ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                    step === "input"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-muted"
-                  }`}
-                >
-                  1
-                </div>
-                <span className="text-sm font-medium">Input</span>
-              </div>
-              <Separator className="w-16" />
-              <div
-                className={`flex items-center gap-2 ${
-                  step === "suggestion"
+                  step === "input" || step === "suggestion"
                     ? "text-primary"
                     : "text-muted-foreground"
                 }`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                    step === "suggestion"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium ${
+                    step === "input" || step === "suggestion"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : step === "disclosure"
+                        ? "border-primary bg-primary/20 text-primary"
+                        : "border-muted"
+                  }`}
+                >
+                  1
+                </div>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Campaign Details
+                </span>
+              </div>
+
+              {/* Connector line */}
+              <div className="w-8 sm:w-12 h-px bg-border mx-2" />
+
+              {/* Step 2: Disclosures */}
+              <div
+                className={`flex items-center gap-2 ${
+                  step === "disclosure"
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium ${
+                    step === "disclosure"
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-muted"
                   }`}
                 >
                   2
                 </div>
-                <span className="text-sm font-medium">AI Suggestion</span>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Disclosures
+                </span>
+              </div>
+
+              {/* Connector line */}
+              <div className="w-8 sm:w-12 h-px bg-border mx-2" />
+
+              {/* Step 3: Submit */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-medium border-muted`}
+                >
+                  3
+                </div>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  Submit
+                </span>
               </div>
             </div>
           </div>
@@ -682,6 +803,7 @@ export function CreateCampaignPageContent() {
                         type={offer.type}
                         vendor={offer.vendor}
                         parameters={offer.parameters}
+                        disclosureCount={offer.disclosures?.length ?? 0}
                         selectable
                         selected={selectedOfferIds.includes(offer.id)}
                         onSelect={toggleOfferSelection}
@@ -1016,10 +1138,14 @@ export function CreateCampaignPageContent() {
                 {/* Select Existing Offers */}
                 <div>
                   <Label className="text-lg font-semibold">
-                    Select Existing Offers (Optional)
+                    {preSelectedOffers.length > 0
+                      ? "Select Additional Offers (Optional)"
+                      : "Select Existing Offers (Optional)"}
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1 mb-3">
-                    Choose from your existing offers to include in this campaign
+                    {preSelectedOffers.length > 0
+                      ? "Your pre-selected offers are already included. Optionally add more."
+                      : "Choose from your existing offers to include in this campaign"}
                   </p>
                   {loadingOffers ? (
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1038,6 +1164,7 @@ export function CreateCampaignPageContent() {
                             type={offer.type}
                             vendor={offer.vendor}
                             parameters={offer.parameters}
+                            disclosureCount={offer.disclosures?.length ?? 0}
                             selectable
                             selected={selectedOfferIds.includes(offer.id)}
                             onSelect={toggleOfferSelection}
@@ -1076,24 +1203,36 @@ export function CreateCampaignPageContent() {
                 Refine Inputs
               </Button>
               <Button
-                onClick={handleCreateCampaign}
+                onClick={() => setStep("disclosure")}
                 disabled={loading}
                 className="gap-2 flex-1"
               >
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Creating Campaign...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Accept & Create Campaign
+                    Continue to Disclosure Preview
                   </>
                 )}
               </Button>
             </div>
           </div>
+        )}
+
+        {/* Step 3: Disclosure Preview */}
+        {step === "disclosure" && (
+          <DisclosurePreviewStep
+            offerIds={selectedOfferIds}
+            campaignName={campaignName || suggestion?.nameHint || "Campaign"}
+            onDisclosureGenerated={handleDisclosureGenerated}
+            onBack={() => setStep("suggestion")}
+            onCreateCampaign={handleCreateCampaignWithDisclosure}
+            loading={loading}
+          />
         )}
       </div>
     </div>

@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   getCampaignWithRelations,
   getEnrollmentsByCampaign,
-  getCampaignSpendingGroups,
 } from "@/lib/db";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricKPI } from "@/components/metric-kpi";
@@ -29,8 +28,10 @@ import {
   Users,
   Target,
   TrendingUp,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
+import { CampaignDisclosurePanel } from "@/components/campaign-disclosure-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,9 @@ interface PageProps {
 }
 
 async function CampaignDetailContent({ id }: { id: string }) {
-  const [campaign, enrollments, spendingGroups] = await Promise.all([
+  const [campaign, enrollments] = await Promise.all([
     getCampaignWithRelations(id),
     getEnrollmentsByCampaign(id),
-    getCampaignSpendingGroups(id),
   ]);
 
   if (!campaign) {
@@ -60,13 +60,14 @@ async function CampaignDetailContent({ id }: { id: string }) {
     projected_lift_pct?: number;
     error_rate_pct?: number;
   };
-  
-  // Check if campaign has linked spending groups for Spend Stim simulation
-  const hasSpendingGroups = spendingGroups.length > 0;
-  const totalSpendingGroupAccounts = spendingGroups.reduce(
-    (sum, sg) => sum + sg.accounts.length,
-    0
+
+  // Disclosure data
+  const campaignDisclosure = campaign.campaignDisclosures?.[0] ?? null;
+  // Check if any offers have disclosures
+  const offersWithDisclosures = campaign.campaignOffers.filter(
+    (co) => co.offer.disclosures?.length > 0
   );
+  const hasOfferDisclosures = offersWithDisclosures.length > 0;
 
   // Group enrollments by status
   const enrollmentStats = {
@@ -121,17 +122,15 @@ async function CampaignDetailContent({ id }: { id: string }) {
                   Run E2E Test
                 </Button>
               </form>
-              {hasSpendingGroups && (
-                <form
-                  action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
-                  method="POST"
-                >
-                  <Button variant="outline" className="gap-2" type="submit">
-                    <TrendingUp className="h-4 w-4" />
-                    Run Spend Stim
-                  </Button>
-                </form>
-              )}
+              <form
+                action={`/api/simulate-spend-stim?campaignId=${campaign.id}`}
+                method="POST"
+              >
+                <Button variant="outline" className="gap-2" type="submit">
+                  <TrendingUp className="h-4 w-4" />
+                  Run Spend Stim
+                </Button>
+              </form>
               {campaign.status === "IN_REVIEW" && (
                 <form
                   action={`/api/campaigns/${campaign.id}/publish`}
@@ -193,7 +192,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
       {/* Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-5">
+          <TabsList className="grid w-full max-w-4xl grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="offers">Offers</TabsTrigger>
             <TabsTrigger value="enrollments">
@@ -205,6 +204,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
               )}
             </TabsTrigger>
             <TabsTrigger value="targeting">Targeting</TabsTrigger>
+            <TabsTrigger value="disclosures">Disclosures</TabsTrigger>
             <TabsTrigger value="controls">Controls</TabsTrigger>
           </TabsList>
 
@@ -535,6 +535,38 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Disclosures Tab */}
+          <TabsContent value="disclosures" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Campaign Disclosure
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CampaignDisclosurePanel
+                  campaignId={campaign.id}
+                  existingDisclosure={
+                    campaignDisclosure
+                      ? {
+                          id: campaignDisclosure.id,
+                          content: campaignDisclosure.content,
+                          sourceOfferIds:
+                            (campaignDisclosure.sourceOfferIds as string[]) ||
+                            [],
+                          generatedAt:
+                            campaignDisclosure.generatedAt.toISOString(),
+                        }
+                      : null
+                  }
+                  offerCount={offersWithDisclosures.length}
+                  hasOfferDisclosures={hasOfferDisclosures}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Controls & Approvals Tab */}

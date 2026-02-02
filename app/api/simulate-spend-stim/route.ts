@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { startSpendStimSimulation } from "@/lib/adapters/mock/spend-stim";
-import { getCampaignSpendingGroups } from "@/lib/db";
+import { getCampaignOfferCriteria } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,17 +29,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify campaign has spending groups
-    const spendingGroups = await getCampaignSpendingGroups(campaignId);
-    if (spendingGroups.length === 0) {
+    // Verify campaign has offers (offer-based account selection)
+    const { offers } = await getCampaignOfferCriteria(campaignId);
+    if (offers.length === 0) {
       if (isFormSubmission) {
         // Redirect back to campaign page with error
         const redirectUrl = new URL(`/campaigns/${campaignId}`, request.url);
-        redirectUrl.searchParams.set("error", "no-spending-groups");
+        redirectUrl.searchParams.set("error", "no-offers");
         return NextResponse.redirect(redirectUrl, 303);
       }
       return NextResponse.json(
-        { error: "Campaign has no linked spending groups. Spend Stim simulation requires spending groups." },
+        { error: "Campaign has no offers. Spend Stim simulation requires at least one offer." },
         { status: 400 }
       );
     }

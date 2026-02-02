@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { OfferTypeBadge } from "@/components/offer-type-badge";
+import { DocumentLinkDialog } from "@/components/document-link-dialog";
 import type { OfferType } from "@/lib/db/schema";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, FileText, Link2 } from "lucide-react";
 
 interface OfferCardProps {
   id: string;
@@ -14,9 +17,11 @@ interface OfferCardProps {
   vendor: string | null;
   parameters: Record<string, unknown>;
   campaignCount?: number;
+  disclosureCount?: number;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  onDisclosureUploaded?: () => void;
 }
 
 export function OfferCard({
@@ -26,19 +31,29 @@ export function OfferCard({
   vendor,
   parameters,
   campaignCount = 0,
+  disclosureCount = 0,
   selectable = false,
   selected = false,
   onSelect,
+  onDisclosureUploaded,
 }: OfferCardProps) {
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+
   const handleClick = () => {
     if (selectable && onSelect) {
       onSelect(id);
     }
   };
 
+  const handleLinkClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLinkDialogOpen(true);
+  };
+
   const content = (
     <Card
-      className={`transition-all ${
+      className={`h-full flex flex-col transition-all ${
         selectable
           ? `cursor-pointer hover:shadow-lg ${
               selected ? "border-primary ring-2 ring-primary" : "hover:border-primary"
@@ -65,8 +80,8 @@ export function OfferCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
+      <CardContent className="flex-1 flex flex-col">
+        <div className="flex-1 space-y-2">
           {/* Display key parameters */}
           {type === "POINTS_MULTIPLIER" && parameters.multiplier != null && (
             <p className="text-sm text-muted-foreground">
@@ -91,11 +106,37 @@ export function OfferCard({
             </p>
           )}
 
-          {!selectable && campaignCount > 0 && (
-            <p className="text-xs text-muted-foreground pt-2 border-t">
-              Used in {campaignCount} campaign{campaignCount !== 1 ? "s" : ""}
-            </p>
-          )}
+          <div className="pt-2 border-t space-y-1.5">
+            {!selectable && campaignCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Used in {campaignCount} campaign{campaignCount !== 1 ? "s" : ""}
+              </p>
+            )}
+            <div className="flex items-center justify-between">
+              {disclosureCount > 0 ? (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5 text-green-600" />
+                  {disclosureCount} disclosure{disclosureCount !== 1 ? "s" : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                  <FileText className="h-3.5 w-3.5" />
+                  No disclosure
+                </span>
+              )}
+              {!selectable && disclosureCount === 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1"
+                  onClick={handleLinkClick}
+                >
+                  <Link2 className="h-3 w-3" />
+                  Link
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -105,6 +146,16 @@ export function OfferCard({
     return content;
   }
 
-  return <Link href={`/offers/${id}`}>{content}</Link>;
+  return (
+    <>
+      <Link href={`/offers/${id}`}>{content}</Link>
+      <DocumentLinkDialog
+        offerId={id}
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        onLinked={() => onDisclosureUploaded?.()}
+      />
+    </>
+  );
 }
 

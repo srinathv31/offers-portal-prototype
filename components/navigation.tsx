@@ -51,6 +51,17 @@ export function Navigation() {
                 Offers
               </Link>
               <Link
+                href="/documents"
+                className={cn(
+                  "px-3 py-2 text-sm font-medium transition-colors hover:text-foreground",
+                  pathname.startsWith("/documents")
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                Documents
+              </Link>
+              <Link
                 href="/spending-groups"
                 className={cn(
                   "px-3 py-2 text-sm font-medium transition-colors hover:text-foreground",
