@@ -53,7 +53,7 @@ export function OfferCard({
 
   const content = (
     <Card
-      className={`transition-all ${
+      className={`h-full flex flex-col transition-all ${
         selectable
           ? `cursor-pointer hover:shadow-lg ${
               selected ? "border-primary ring-2 ring-primary" : "hover:border-primary"
@@ -80,8 +80,8 @@ export function OfferCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
+      <CardContent className="flex-1 flex flex-col">
+        <div className="flex-1 space-y-2">
           {/* Display key parameters */}
           {type === "POINTS_MULTIPLIER" && parameters.multiplier != null && (
             <p className="text-sm text-muted-foreground">

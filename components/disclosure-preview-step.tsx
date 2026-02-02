@@ -65,13 +65,16 @@ export function DisclosurePreviewStep({
   onCreateCampaign,
   loading,
 }: DisclosurePreviewStepProps) {
-  const [generationStage, setGenerationStage] = useState<GenerationStage>("idle");
+  const [generationStage, setGenerationStage] =
+    useState<GenerationStage>("idle");
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sourceOfferIds, setSourceOfferIds] = useState<string[]>([]);
 
   // Internal state for fetched offers with disclosures
-  const [selectedOffers, setSelectedOffers] = useState<OfferWithDisclosures[]>([]);
+  const [selectedOffers, setSelectedOffers] = useState<OfferWithDisclosures[]>(
+    [],
+  );
   const [loadingOffers, setLoadingOffers] = useState(true);
 
   // Fetch offers with disclosures when component mounts or offerIds change
@@ -102,14 +105,14 @@ export function DisclosurePreviewStep({
 
   // Calculate disclosure statistics
   const offersWithDisclosures = selectedOffers.filter(
-    (o) => o.disclosures && o.disclosures.length > 0
+    (o) => o.disclosures && o.disclosures.length > 0,
   );
   const offersWithoutDisclosures = selectedOffers.filter(
-    (o) => !o.disclosures || o.disclosures.length === 0
+    (o) => !o.disclosures || o.disclosures.length === 0,
   );
   const totalDisclosures = offersWithDisclosures.reduce(
     (sum, o) => sum + (o.disclosures?.length || 0),
-    0
+    0,
   );
   const hasAnyDisclosures = offersWithDisclosures.length > 0;
 
@@ -141,18 +144,20 @@ export function DisclosurePreviewStep({
 
       if (!data.content) {
         throw new Error(
-          data.message || "No disclosure content could be generated"
+          data.message || "No disclosure content could be generated",
         );
       }
 
       setGeneratedContent(data.content);
-      setSourceOfferIds(data.offersIncluded.map((o: { offerId: string }) => o.offerId));
+      setSourceOfferIds(
+        data.offersIncluded.map((o: { offerId: string }) => o.offerId),
+      );
       setGenerationStage("done");
 
       // Notify parent component
       onDisclosureGenerated(
         data.content,
-        data.offersIncluded.map((o: { offerId: string }) => o.offerId)
+        data.offersIncluded.map((o: { offerId: string }) => o.offerId),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
@@ -167,8 +172,7 @@ export function DisclosurePreviewStep({
     handleGenerateDisclosure();
   };
 
-  const isGenerating =
-    generationStage !== "idle" && generationStage !== "done";
+  const isGenerating = generationStage !== "idle" && generationStage !== "done";
 
   return (
     <div className="space-y-6">
@@ -227,16 +231,19 @@ export function DisclosurePreviewStep({
           </div>
 
           {/* Warning if some offers don't have disclosures */}
-          {!loadingOffers && offersWithoutDisclosures.length > 0 && hasAnyDisclosures && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {offersWithoutDisclosures.length} offer
-                {offersWithoutDisclosures.length !== 1 ? "s" : ""} without
-                disclosures will be skipped in the combined disclosure document.
-              </AlertDescription>
-            </Alert>
-          )}
+          {!loadingOffers &&
+            offersWithoutDisclosures.length > 0 &&
+            hasAnyDisclosures && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {offersWithoutDisclosures.length} offer
+                  {offersWithoutDisclosures.length !== 1 ? "s" : ""} without
+                  disclosures will be skipped in the combined disclosure
+                  document.
+                </AlertDescription>
+              </Alert>
+            )}
 
           {/* No disclosures warning */}
           {!loadingOffers && !hasAnyDisclosures && (
@@ -281,7 +288,7 @@ export function DisclosurePreviewStep({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Generate Campaign Disclosure
+                    AI Generate Campaign Disclosure
                   </>
                 )}
               </Button>
