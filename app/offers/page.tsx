@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Activity } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfferCard } from "@/components/offer-card";
 import { Plus, Search, MousePointerClick, X, Sparkles } from "lucide-react";
@@ -19,7 +25,9 @@ interface Offer {
   type: OfferType;
   vendor: string | null;
   parameters: Record<string, unknown>;
-  campaignOffers: Array<{ campaign: { id: string; name: string; status: string } }>;
+  campaignOffers: Array<{
+    campaign: { id: string; name: string; status: string };
+  }>;
   disclosures: Array<{ id: string }>;
 }
 
@@ -34,7 +42,9 @@ export default function OffersPage() {
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedOfferIds, setSelectedOfferIds] = useState<Set<string>>(new Set());
+  const [selectedOfferIds, setSelectedOfferIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const fetchOffers = async () => {
     setLoading(true);
@@ -94,7 +104,7 @@ export default function OffersPage() {
 
   // Get unique vendors from offers
   const uniqueVendors = Array.from(
-    new Set(offers.map((o) => o.vendor).filter(Boolean))
+    new Set(offers.map((o) => o.vendor).filter(Boolean)),
   ).sort() as string[];
 
   return (
@@ -116,14 +126,18 @@ export default function OffersPage() {
                 onClick={toggleSelectionMode}
               >
                 <MousePointerClick className="h-4 w-4" />
-                {selectionMode ? "Cancel Select" : "Select"}
+                {selectionMode
+                  ? "Cancel Selection"
+                  : "Create Campaign from Offers"}
               </Button>
-              <Link href="/create-offer">
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create New Offer
-                </Button>
-              </Link>
+              <Activity mode={!selectionMode ? "visible" : "hidden"}>
+                <Link href="/create-offer">
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create New Offer
+                  </Button>
+                </Link>
+              </Activity>
             </div>
           </div>
         </div>
@@ -148,7 +162,9 @@ export default function OffersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="POINTS_MULTIPLIER">Points Multiplier</SelectItem>
+                <SelectItem value="POINTS_MULTIPLIER">
+                  Points Multiplier
+                </SelectItem>
                 <SelectItem value="CASHBACK">Cashback</SelectItem>
                 <SelectItem value="DISCOUNT">Discount</SelectItem>
                 <SelectItem value="BONUS">Bonus</SelectItem>
@@ -232,16 +248,23 @@ export default function OffersPage() {
           <div className="container mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">
-                {selectedOfferIds.size} offer{selectedOfferIds.size !== 1 ? "s" : ""} selected
+                {selectedOfferIds.size} offer
+                {selectedOfferIds.size !== 1 ? "s" : ""} selected
               </span>
-              <Button variant="ghost" size="sm" onClick={clearSelection} className="gap-1 text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                className="gap-1 text-muted-foreground"
+              >
                 <X className="h-3.5 w-3.5" />
                 Clear
               </Button>
             </div>
             <Button onClick={handleCreateCampaign} className="gap-2">
               <Sparkles className="h-4 w-4" />
-              Create Campaign from {selectedOfferIds.size} Offer{selectedOfferIds.size !== 1 ? "s" : ""}
+              Create Campaign from {selectedOfferIds.size} Offer
+              {selectedOfferIds.size !== 1 ? "s" : ""}
             </Button>
           </div>
         </div>
