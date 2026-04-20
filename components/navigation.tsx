@@ -70,7 +70,7 @@ export function Navigation() {
                     : "text-muted-foreground"
                 )}
               >
-                Spending Groups
+                Segmentation Groups
               </Link>
               <Link
                 href="/create-campaign"

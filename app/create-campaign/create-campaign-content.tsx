@@ -423,7 +423,7 @@ export function CreateCampaignPageContent() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                <CardTitle>{loadingPreSelectedOffers ? "Loading Selected Offers..." : "Loading Spending Group..."}</CardTitle>
+                <CardTitle>{loadingPreSelectedOffers ? "Loading Selected Offers..." : "Loading Segmentation Group..."}</CardTitle>
               </div>
               <CardDescription>
                 Preparing AI-assisted campaign creation
@@ -453,7 +453,7 @@ export function CreateCampaignPageContent() {
             {preSelectedOffers.length > 0
               ? "Back to Offers"
               : spendingGroupContext
-                ? "Back to Spending Groups"
+                ? "Back to Segmentation Groups"
                 : "Back to Dashboard"}
           </Link>
           <h1 className="text-4xl font-bold tracking-tight">
