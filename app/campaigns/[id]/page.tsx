@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { CampaignOfferDisclosuresList } from "@/components/campaign-offer-disclosures-list";
+import { WavesTab } from "@/components/waves-tab";
 
 export const dynamic = "force-dynamic";
 
@@ -184,7 +185,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
       {/* Tabs */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-4xl grid-cols-6">
+          <TabsList className="grid w-full max-w-4xl grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="offers">Offers</TabsTrigger>
             <TabsTrigger value="enrollments">
@@ -196,6 +197,7 @@ async function CampaignDetailContent({ id }: { id: string }) {
               )}
             </TabsTrigger>
             <TabsTrigger value="targeting">Targeting</TabsTrigger>
+            <TabsTrigger value="waves">Waves</TabsTrigger>
             <TabsTrigger value="disclosures">Disclosures</TabsTrigger>
             <TabsTrigger value="controls">Controls</TabsTrigger>
           </TabsList>
@@ -527,6 +529,14 @@ async function CampaignDetailContent({ id }: { id: string }) {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Waves Tab */}
+          <TabsContent value="waves" className="space-y-6">
+            <WavesTab
+              campaignId={campaign.id}
+              campaignStatus={campaign.status}
+            />
           </TabsContent>
 
           {/* Disclosures Tab */}

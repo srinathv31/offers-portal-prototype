@@ -87,6 +87,12 @@ export const simulationTypeEnum = pgEnum("simulation_type", [
   "SPEND_STIM",
 ]);
 
+export const waveStatusEnum = pgEnum("wave_status", [
+  "PENDING",
+  "ACTIVE",
+  "COMPLETED",
+]);
+
 // TypeScript types from enums
 export type CampaignStatus =
   | "DRAFT"
@@ -118,6 +124,7 @@ export type CreditCardProduct =
   | "CLEAR";
 export type SimulationType = "E2E_TEST" | "SPEND_STIM";
 export type ProjectionConfidence = "HIGH" | "MEDIUM" | "LOW";
+export type WaveStatus = "PENDING" | "ACTIVE" | "COMPLETED";
 
 // Account projection type for Spend Stim simulations
 export interface AccountProjection {
@@ -207,6 +214,9 @@ export const accountOfferEnrollments = pgTable("account_offer_enrollments", {
     .notNull()
     .references(() => offers.id),
   campaignId: uuid("campaign_id").references(() => campaigns.id), // nullable - which campaign enrolled them
+  waveId: uuid("wave_id").references(() => campaignWaves.id, {
+    onDelete: "set null",
+  }), // nullable - which wave bucketed this enrollment
   status: enrollmentStatusEnum("status").notNull().default("ENROLLED"),
   enrolledAt: timestamp("enrolled_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at"), // nullable
@@ -219,6 +229,22 @@ export const accountOfferEnrollments = pgTable("account_offer_enrollments", {
   rewardEarned: integer("reward_earned"), // nullable, in cents
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Campaign Waves - Phased rollout plan for a campaign
+export const campaignWaves = pgTable("campaign_waves", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(), // 1-based wave order
+  rolloutPct: numeric("rollout_pct", { precision: 5, scale: 2 }).notNull(),
+  customerCount: integer("customer_count").notNull().default(0),
+  startDate: timestamp("start_date"), // nullable for campaigns without dates
+  endDate: timestamp("end_date"),
+  status: waveStatusEnum("status").notNull().default("PENDING"),
+  planVersion: integer("plan_version").notNull().default(1),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
 });
 
 // Credit Cards - Individual credit card entities
@@ -496,6 +522,7 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   simulationRuns: many(simulationRuns),
   auditLogs: many(auditLogs),
   accountOfferEnrollments: many(accountOfferEnrollments),
+  waves: many(campaignWaves),
   channelPlan: one(channelPlans, {
     fields: [campaigns.channelPlanId],
     references: [channelPlans.id],
@@ -509,6 +536,17 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
     references: [controlChecklists.id],
   }),
 }));
+
+export const campaignWavesRelations = relations(
+  campaignWaves,
+  ({ one, many }) => ({
+    campaign: one(campaigns, {
+      fields: [campaignWaves.campaignId],
+      references: [campaigns.id],
+    }),
+    enrollments: many(accountOfferEnrollments),
+  })
+);
 
 export const offersRelations = relations(offers, ({ many }) => ({
   campaignOffers: many(campaignOffers),
@@ -580,6 +618,10 @@ export const accountOfferEnrollmentsRelations = relations(
     campaign: one(campaigns, {
       fields: [accountOfferEnrollments.campaignId],
       references: [campaigns.id],
+    }),
+    wave: one(campaignWaves, {
+      fields: [accountOfferEnrollments.waveId],
+      references: [campaignWaves.id],
     }),
     transactions: many(accountTransactions),
   })

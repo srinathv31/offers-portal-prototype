@@ -26,6 +26,7 @@ import { seedSpendingGroups } from "./seed-data/spending-groups";
 import { seedEnrollments } from "./seed-data/enrollments";
 import { seedTransactions } from "./seed-data/transactions";
 import { seedDisclosures } from "./seed-data/disclosures";
+import { seedWaves } from "./seed-data/waves";
 
 /**
  * Clear all existing data from the database
@@ -37,6 +38,7 @@ async function clearDatabase() {
   // Clear account-level data first (in reverse order of dependencies)
   await db.delete(schema.accountTransactions);
   await db.delete(schema.accountOfferEnrollments);
+  await db.delete(schema.campaignWaves);
   await db.delete(schema.accountCreditCards);
   await db.delete(schema.creditCards);
 
@@ -198,6 +200,13 @@ async function seed() {
     accountCreditCardsData,
     groupAssignments,
   });
+
+  console.log("\n🌊 Seeding wave plans...");
+  console.log("─".repeat(50));
+  const waves = await seedWaves();
+  console.log(
+    `  ✓ ${waves.total} waves across ${waves.campaignCount} campaigns`
+  );
 
   const endTime = Date.now();
   const duration = ((endTime - startTime) / 1000).toFixed(2);

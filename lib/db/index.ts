@@ -412,6 +412,39 @@ export async function getAccountTransactions(
 // ==========================================
 
 /**
+ * Count the deduplicated set of target accounts for a campaign.
+ * Falls back to summing segment.definitionJson.estimatedSize when no
+ * concrete spending groups are linked yet (e.g. DRAFT campaigns).
+ */
+export async function getCampaignTargetAccountCount(
+  campaignId: string
+): Promise<number> {
+  const groups = await getCampaignSpendingGroups(campaignId);
+  if (groups.length > 0) {
+    const seen = new Set<string>();
+    for (const g of groups) {
+      for (const a of g.accounts) seen.add(a.id);
+    }
+    if (seen.size > 0) return seen.size;
+  }
+
+  const campaign = await db.query.campaigns.findFirst({
+    where: (campaigns, { eq }) => eq(campaigns.id, campaignId),
+    with: {
+      campaignSegments: {
+        with: { segment: true },
+      },
+    },
+  });
+  if (!campaign) return 0;
+
+  return campaign.campaignSegments.reduce((sum, cs) => {
+    const def = cs.segment.definitionJson as { estimatedSize?: number } | null;
+    return sum + (def?.estimatedSize ?? 0);
+  }, 0);
+}
+
+/**
  * Get spending groups linked to a campaign via segments
  * Used by Spend Stim simulation to find all accounts to analyze
  */
