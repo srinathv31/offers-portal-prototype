@@ -41,7 +41,6 @@ async function clearDatabase() {
   await db.delete(schema.creditCards);
 
   // Clear disclosure data (offerDisclosures references documents via FK)
-  await db.delete(schema.campaignDisclosures);
   await db.delete(schema.offerDisclosures);
   await db.delete(schema.documents);
 

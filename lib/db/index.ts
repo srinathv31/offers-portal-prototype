@@ -47,10 +47,6 @@ export async function getCampaignWithRelations(campaignId: string) {
         orderBy: (runs, { desc }) => [desc(runs.createdAt)],
         limit: 1,
       },
-      campaignDisclosures: {
-        orderBy: (d, { desc }) => [desc(d.generatedAt)],
-        limit: 1,
-      },
     },
   });
 
@@ -611,13 +607,6 @@ export async function getOfferDisclosures(offerId: string) {
   return db.query.offerDisclosures.findMany({
     where: (d, { eq }) => eq(d.offerId, offerId),
     orderBy: (d, { desc }) => [desc(d.createdAt)],
-  });
-}
-
-export async function getCampaignDisclosure(campaignId: string) {
-  return db.query.campaignDisclosures.findFirst({
-    where: (d, { eq }) => eq(d.campaignId, campaignId),
-    orderBy: (d, { desc }) => [desc(d.generatedAt)],
   });
 }
 

@@ -6,7 +6,6 @@ import {
   segments,
   campaignOffers,
   campaignSegments,
-  campaignDisclosures,
   channelPlans,
 } from "@/lib/db/schema";
 import type { StrategySuggestion } from "@/lib/ai/types";
@@ -23,8 +22,6 @@ export async function POST(request: NextRequest) {
       channels,
       offerIds,
       segmentIds,
-      disclosureContent,
-      disclosureSourceOfferIds,
     } = body;
 
     if (!name || !purpose) {
@@ -111,19 +108,6 @@ export async function POST(request: NextRequest) {
       );
       console.log(
         `[Create Campaign] Linked ${segmentIds.length} existing segments to campaign ${campaign.id}`
-      );
-    }
-
-    // If disclosure content provided (from preview step), create campaign disclosure
-    if (disclosureContent) {
-      await db.insert(campaignDisclosures).values({
-        campaignId: campaign.id,
-        content: disclosureContent,
-        sourceOfferIds: disclosureSourceOfferIds || [],
-        generatedAt: new Date(),
-      });
-      console.log(
-        `[Create Campaign] Created campaign disclosure for campaign ${campaign.id}`
       );
     }
 

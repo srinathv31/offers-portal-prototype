@@ -43,6 +43,13 @@
       "when": 1770069584510,
       "tag": "0005_chubby_hercules",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777478488975,
+      "tag": "0006_keen_stranger",
+      "breakpoints": true
     }
   ]
 }

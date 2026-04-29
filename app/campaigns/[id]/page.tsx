@@ -31,7 +31,7 @@ import {
   FileText,
 } from "lucide-react";
 import { format } from "date-fns";
-import { CampaignDisclosurePanel } from "@/components/campaign-disclosure-panel";
+import { CampaignOfferDisclosuresList } from "@/components/campaign-offer-disclosures-list";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +60,6 @@ async function CampaignDetailContent({ id }: { id: string }) {
     projected_lift_pct?: number;
     error_rate_pct?: number;
   };
-
-  // Disclosure data
-  const campaignDisclosure = campaign.campaignDisclosures?.[0] ?? null;
-  // Check if any offers have disclosures
-  const offersWithDisclosures = campaign.campaignOffers.filter(
-    (co) => co.offer.disclosures?.length > 0
-  );
-  const hasOfferDisclosures = offersWithDisclosures.length > 0;
 
   // Group enrollments by status
   const enrollmentStats = {
@@ -543,27 +535,29 @@ async function CampaignDetailContent({ id }: { id: string }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Campaign Disclosure
+                  Offer Disclosures
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Customers see the disclosure for the specific offer they
+                  enroll in. Each offer&apos;s disclosure is shown individually
+                  below.
+                </p>
               </CardHeader>
               <CardContent>
-                <CampaignDisclosurePanel
-                  campaignId={campaign.id}
-                  existingDisclosure={
-                    campaignDisclosure
-                      ? {
-                          id: campaignDisclosure.id,
-                          content: campaignDisclosure.content,
-                          sourceOfferIds:
-                            (campaignDisclosure.sourceOfferIds as string[]) ||
-                            [],
-                          generatedAt:
-                            campaignDisclosure.generatedAt.toISOString(),
-                        }
-                      : null
-                  }
-                  offerCount={offersWithDisclosures.length}
-                  hasOfferDisclosures={hasOfferDisclosures}
+                <CampaignOfferDisclosuresList
+                  offers={offers.map((o) => ({
+                    id: o.id,
+                    name: o.name,
+                    type: o.type,
+                    vendor: o.vendor,
+                    disclosures: (o.disclosures || []).map((d) => ({
+                      id: d.id,
+                      fileName: d.fileName,
+                      mimeType: d.mimeType,
+                      fileSize: d.fileSize,
+                    })),
+                  }))}
+                  emptyMessage="No offers in this campaign yet."
                 />
               </CardContent>
             </Card>

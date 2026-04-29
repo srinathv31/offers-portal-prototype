@@ -110,10 +110,6 @@ export function CreateCampaignPageContent() {
   const [preSelectedOffers, setPreSelectedOffers] = useState<Offer[]>([]);
   const [loadingPreSelectedOffers, setLoadingPreSelectedOffers] = useState(false);
 
-  // Disclosure preview state
-  const [generatedDisclosure, setGeneratedDisclosure] = useState<string | null>(null);
-  const [disclosureSourceOfferIds, setDisclosureSourceOfferIds] = useState<string[]>([]);
-
   // Format currency helper
   const formatCurrency = (cents: number): string => {
     return new Intl.NumberFormat("en-US", {
@@ -363,11 +359,6 @@ export function CreateCampaignPageContent() {
     );
   };
 
-  const handleDisclosureGenerated = (content: string, sourceOfferIds: string[]) => {
-    setGeneratedDisclosure(content);
-    setDisclosureSourceOfferIds(sourceOfferIds);
-  };
-
   const handleCreateCampaignWithDisclosure = async () => {
     setLoading(true);
     setError(null);
@@ -384,11 +375,6 @@ export function CreateCampaignPageContent() {
           segmentIds:
             spendingGroupSegmentIds.length > 0
               ? spendingGroupSegmentIds
-              : undefined,
-          disclosureContent: generatedDisclosure || undefined,
-          disclosureSourceOfferIds:
-            disclosureSourceOfferIds.length > 0
-              ? disclosureSourceOfferIds
               : undefined,
         }),
       });
@@ -1227,8 +1213,6 @@ export function CreateCampaignPageContent() {
         {step === "disclosure" && (
           <DisclosurePreviewStep
             offerIds={selectedOfferIds}
-            campaignName={campaignName || suggestion?.nameHint || "Campaign"}
-            onDisclosureGenerated={handleDisclosureGenerated}
             onBack={() => setStep("suggestion")}
             onCreateCampaign={handleCreateCampaignWithDisclosure}
             loading={loading}
