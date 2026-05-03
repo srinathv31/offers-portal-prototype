@@ -63,10 +63,59 @@ export async function getOfferWithCampaigns(offerId: string) {
         },
       },
       disclosures: true,
+      clonedFrom: {
+        columns: { id: true, name: true },
+      },
     },
   });
 
   return offer;
+}
+
+export async function cloneOffer(
+  sourceOfferId: string,
+  overrides: {
+    name: string;
+    effectiveFrom?: Date | null;
+    effectiveTo?: Date | null;
+  }
+) {
+  const source = await db.query.offers.findFirst({
+    where: (offers, { eq }) => eq(offers.id, sourceOfferId),
+    with: { disclosures: true },
+  });
+  if (!source) return null;
+
+  return db.transaction(async (tx) => {
+    const [cloned] = await tx
+      .insert(schema.offers)
+      .values({
+        name: overrides.name,
+        type: source.type,
+        vendor: source.vendor,
+        parameters: source.parameters ?? {},
+        hasProgressTracking: source.hasProgressTracking,
+        progressTarget: source.progressTarget,
+        effectiveFrom: overrides.effectiveFrom ?? null,
+        effectiveTo: overrides.effectiveTo ?? null,
+        clonedFromOfferId: source.id,
+      })
+      .returning();
+
+    if (source.disclosures.length > 0) {
+      await tx.insert(schema.offerDisclosures).values(
+        source.disclosures.map((d) => ({
+          offerId: cloned.id,
+          fileName: d.fileName,
+          storagePath: d.storagePath,
+          mimeType: d.mimeType,
+          fileSize: d.fileSize,
+          documentId: d.documentId,
+        }))
+      );
+    }
+    return cloned;
+  });
 }
 
 export interface OfferFilters {

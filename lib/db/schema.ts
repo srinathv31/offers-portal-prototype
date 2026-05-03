@@ -341,6 +341,10 @@ export const offers = pgTable("offers", {
   } | null>(),
   effectiveFrom: timestamp("effective_from"),
   effectiveTo: timestamp("effective_to"),
+  clonedFromOfferId: uuid("cloned_from_offer_id").references(
+    (): any => offers.id,
+    { onDelete: "set null" }
+  ),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -548,10 +552,16 @@ export const campaignWavesRelations = relations(
   })
 );
 
-export const offersRelations = relations(offers, ({ many }) => ({
+export const offersRelations = relations(offers, ({ many, one }) => ({
   campaignOffers: many(campaignOffers),
   accountOfferEnrollments: many(accountOfferEnrollments),
   disclosures: many(offerDisclosures),
+  clonedFrom: one(offers, {
+    fields: [offers.clonedFromOfferId],
+    references: [offers.id],
+    relationName: "offer_clones",
+  }),
+  clones: many(offers, { relationName: "offer_clones" }),
 }));
 
 export const segmentsRelations = relations(segments, ({ many }) => ({

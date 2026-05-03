@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OfferTypeBadge } from "@/components/offer-type-badge";
 import { DocumentLinkDialog } from "@/components/document-link-dialog";
+import { CloneOfferDialog } from "@/components/clone-offer-dialog";
 import type { OfferType } from "@/lib/db/schema";
-import { CheckCircle2, FileText, Link2 } from "lucide-react";
+import { CheckCircle2, Copy, FileText } from "lucide-react";
 
 interface OfferCardProps {
   id: string;
@@ -38,6 +39,7 @@ export function OfferCard({
   onDisclosureUploaded,
 }: OfferCardProps) {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
 
   const handleClick = () => {
     if (selectable && onSelect) {
@@ -49,6 +51,12 @@ export function OfferCard({
     e.preventDefault();
     e.stopPropagation();
     setLinkDialogOpen(true);
+  };
+
+  const handleCloneClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCloneDialogOpen(true);
   };
 
   const content = (
@@ -113,7 +121,23 @@ export function OfferCard({
               </p>
             )}
             <div className="flex items-center justify-between">
-              {disclosureCount > 0 ? (
+              {!selectable ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-6 px-2 text-xs gap-1 -ml-2 ${
+                    disclosureCount > 0 ? "text-muted-foreground" : "text-amber-600 hover:text-amber-700"
+                  }`}
+                  onClick={handleLinkClick}
+                >
+                  <FileText
+                    className={`h-3.5 w-3.5 ${disclosureCount > 0 ? "text-green-600" : ""}`}
+                  />
+                  {disclosureCount > 0
+                    ? `${disclosureCount} disclosure${disclosureCount !== 1 ? "s" : ""}`
+                    : "Add disclosure"}
+                </Button>
+              ) : disclosureCount > 0 ? (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="h-3.5 w-3.5 text-green-600" />
                   {disclosureCount} disclosure{disclosureCount !== 1 ? "s" : ""}
@@ -124,15 +148,15 @@ export function OfferCard({
                   No disclosure
                 </span>
               )}
-              {!selectable && disclosureCount === 0 && (
+              {!selectable && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs gap-1"
-                  onClick={handleLinkClick}
+                  onClick={handleCloneClick}
                 >
-                  <Link2 className="h-3 w-3" />
-                  Link
+                  <Copy className="h-3 w-3" />
+                  Clone
                 </Button>
               )}
             </div>
@@ -154,6 +178,12 @@ export function OfferCard({
         open={linkDialogOpen}
         onOpenChange={setLinkDialogOpen}
         onLinked={() => onDisclosureUploaded?.()}
+      />
+      <CloneOfferDialog
+        sourceOfferId={id}
+        sourceOfferName={name}
+        open={cloneDialogOpen}
+        onOpenChange={setCloneDialogOpen}
       />
     </>
   );

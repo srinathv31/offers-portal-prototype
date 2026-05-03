@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ExternalLink, TrendingUp, Pencil, Target, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, TrendingUp, Pencil, Target, FileText, Copy } from "lucide-react";
 import { format } from "date-fns";
 import type { OfferType } from "@/lib/db/schema";
 import { getSignedUrl } from "@/lib/supabase/storage";
 import { DisclosureUpload } from "@/components/disclosure-upload";
+import { CloneOfferButton } from "@/components/clone-offer-button";
 
 export const dynamic = "force-dynamic";
 
@@ -61,12 +62,15 @@ async function OfferDetailContent({ id }: { id: string }) {
               <ArrowLeft className="h-4 w-4" />
               Back to Offers
             </Link>
-            <Link href={`/offers/${id}/edit`}>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Pencil className="h-4 w-4" />
-                Edit Offer
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <CloneOfferButton offerId={id} offerName={offer.name} />
+              <Link href={`/offers/${id}/edit`}>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Pencil className="h-4 w-4" />
+                  Edit Offer
+                </Button>
+              </Link>
+            </div>
           </div>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
@@ -84,6 +88,18 @@ async function OfferDetailContent({ id }: { id: string }) {
               <p className="text-muted-foreground">
                 Used in {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""}
               </p>
+              {offer.clonedFrom && (
+                <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
+                  <Copy className="h-3 w-3" />
+                  Cloned from{" "}
+                  <Link
+                    href={`/offers/${offer.clonedFrom.id}`}
+                    className="underline hover:text-foreground"
+                  >
+                    {offer.clonedFrom.name}
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -332,6 +348,20 @@ async function OfferDetailContent({ id }: { id: string }) {
                   <dt className="text-sm font-medium text-muted-foreground">Effective To</dt>
                   <dd className="text-sm mt-1">
                     {format(new Date(offer.effectiveTo), "MMM d, yyyy")}
+                  </dd>
+                </div>
+              )}
+              {offer.clonedFrom && (
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Cloned From</dt>
+                  <dd className="text-sm mt-1">
+                    <Link
+                      href={`/offers/${offer.clonedFrom.id}`}
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      {offer.clonedFrom.name}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </dd>
                 </div>
               )}
