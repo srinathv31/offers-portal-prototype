@@ -83,6 +83,17 @@ export function Navigation() {
               >
                 Create Campaign
               </Link>
+              <Link
+                href="/mascots"
+                className={cn(
+                  "px-3 py-2 text-sm font-medium transition-colors hover:text-foreground",
+                  pathname === "/mascots"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                Coral AI
+              </Link>
             </div>
           </div>
           <ModeToggle />
