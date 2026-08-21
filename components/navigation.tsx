@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CoralAvatar } from "@/components/coral-avatar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
 
@@ -96,7 +97,10 @@ export function Navigation() {
               </Link>
             </div>
           </div>
-          <ModeToggle />
+          <div className="flex items-center gap-3">
+            <CoralAvatar />
+            <ModeToggle />
+          </div>
         </div>
       </div>
     </nav>

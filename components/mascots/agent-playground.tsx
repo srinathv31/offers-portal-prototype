@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { CoralLattice } from "./coral-lattice";
-import { CoralPip } from "./coral-pip";
+import { CoralMascot } from "./coral-mascot";
+import { useCoralSkin } from "./coral-skin";
 import type { MascotState } from "./types";
 
 /**
@@ -11,7 +11,8 @@ import type { MascotState } from "./types";
  * and an error-plus-recovery) drive the mascot through its real workflow
  * states — listening while the user types, thinking with live status,
  * streaming a reply, celebrating the result, and erroring when a system
- * fails. Switch mascots mid-run; the scenario keeps playing.
+ * fails. The mascot is the active skin — switch it mid-run (or unlock it
+ * the fun way) and the scenario keeps playing.
  */
 
 type Role = "user" | "agent" | "status" | "error" | "result";
@@ -33,7 +34,7 @@ const STATE_ACCENT: Record<MascotState, string> = {
 };
 
 export function AgentPlayground() {
-  const [mascot, setMascot] = useState<"lattice" | "pip">("lattice");
+  const { skin, setSkin } = useCoralSkin();
   const [mascotState, setMascotState] = useState<MascotState>("idle");
   const [messages, setMessages] = useState<Message[]>([]);
   const [composer, setComposer] = useState("");
@@ -187,7 +188,6 @@ export function AgentPlayground() {
   }, [run]);
 
   const accent = STATE_ACCENT[mascotState];
-  const Mascot = mascot === "lattice" ? CoralLattice : CoralPip;
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]">
@@ -195,7 +195,7 @@ export function AgentPlayground() {
       <div className="flex flex-wrap items-center gap-4 border-b border-white/10 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="grid size-12 place-items-center overflow-hidden rounded-2xl bg-black/40">
-            <Mascot state={mascotState} size={44} />
+            <CoralMascot state={mascotState} size={44} />
           </div>
           <div>
             <p className="text-sm font-semibold text-white">
@@ -210,15 +210,18 @@ export function AgentPlayground() {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">
+            Skin
+          </span>
           <div className="flex rounded-full border border-white/15 p-0.5">
             {(["lattice", "pip"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
-                onClick={() => setMascot(option)}
+                onClick={() => setSkin(option)}
                 className={cn(
                   "rounded-full px-3.5 py-1 text-xs font-medium capitalize transition-colors",
-                  mascot === option
+                  skin === option
                     ? "bg-white/15 text-white"
                     : "text-white/50 hover:text-white/80"
                 )}
@@ -351,7 +354,7 @@ export function AgentPlayground() {
             </span>
           </button>
           <div className="mt-auto grid place-items-center rounded-2xl border border-white/10 bg-black/25 p-4">
-            <Mascot state={mascotState} size={150} />
+            <CoralMascot state={mascotState} size={150} />
           </div>
         </div>
       </div>

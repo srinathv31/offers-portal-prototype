@@ -20,7 +20,6 @@ interface Direction {
   description: string;
   principles: string[];
   stageHint: string;
-  chooseIf: string;
   accent: string;
   Component: ComponentType<MascotProps>;
 }
@@ -30,18 +29,16 @@ const DIRECTIONS: Direction[] = [
     id: "lattice",
     number: "01",
     name: "Lattice",
-    philosophy: "The Constellation",
+    philosophy: "The Mascot",
     tagline: "Intelligence as orchestration, made visible.",
     description:
-      "A constellation of data points wired into a living network — a nod to what Coral actually does: reasoning across campaigns, accounts, and systems. Lattice shows its thinking: synapse pulses travel the graph while it reasons, the structure contracts to listen, and banded waves radiate as it responds. It's tactile too — drag to spin it, hover and nearby nodes reach toward you. When a task lands, the whole network gathers into a golden checkmark, holds, and springs back.",
+      "Coral's face: a constellation of data points wired into a living network — a nod to what Coral actually does: reasoning across campaigns, accounts, and systems. Lattice shows its thinking: synapse pulses travel the graph while it reasons, the structure contracts to listen, and banded waves radiate as it responds. It's tactile too — drag to spin it, hover and nearby nodes reach toward you. When a task lands, the whole network gathers into a golden checkmark, holds, and springs back.",
     principles: [
       "The network is the metaphor — every node is a system Coral orchestrates",
       "Visible computation builds trust: watch signals propagate, watch errors fracture",
       "The checkmark morph turns “task done” into a signature brand moment",
     ],
     stageHint: "Drag to spin · hover to connect",
-    chooseIf:
-      "You want Coral to project technical depth and precision — an AI that enterprise stakeholders instinctively trust.",
     accent: "#b78bfa",
     Component: CoralLattice,
   },
@@ -49,18 +46,16 @@ const DIRECTIONS: Direction[] = [
     id: "pip",
     number: "02",
     name: "Pip",
-    philosophy: "The Companion",
-    tagline: "Intelligence as a colleague, not a system.",
+    philosophy: "The Easter Egg",
+    tagline: "Hidden in the reef, one secret away.",
     description:
-      "A small coral creature with a face — and therefore a relationship. Pip blinks on its own rhythm, follows your cursor, leans in when you type, glances up while it thinks, and bounces with squash-and-stretch when a campaign ships. It slumps with worried brows when a system fails, dozes off with drifting z's after hours, and startles if you poke it. Personality creates forgiveness, engagement, and memory in a way abstract marks can't.",
+      "Pip lives on as Coral's unlockable skin. Tap the coral mark in the nav five times — or type the classic code ↑ ↑ ↓ ↓ ← → ← → B A — and every Coral surface hatches into Pip: same states, same API, a completely different relationship. It blinks, follows your cursor, worries when systems fail, dozes off after hours, and startles if you poke it. Easter eggs earn disproportionate love: the users who find Pip will tell everyone.",
     principles: [
-      "Eye contact and micro-behaviors make every session feel attended",
-      "A full emotional register: attentive, curious, chatty, delighted, worried, asleep",
-      "Disarms the intimidation of an AI touching money and campaigns",
+      "Zero product-surface cost — serious by default, lovable by choice",
+      "Same seven states and component API, so the swap is free engineering-wise",
+      "Discovery moments build word-of-mouth inside the org",
     ],
     stageHint: "Click Pip · move your cursor",
-    chooseIf:
-      "You want users to love Coral — a warm daily companion that gives the platform a memorable personality.",
     accent: "#ffd76b",
     Component: CoralPip,
   },
@@ -281,13 +276,17 @@ export default function MascotsPage() {
             Coral Intelligence
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            Two finalists.
+            Lattice is Coral.
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-white/60">
-            Lattice and Pip, expanded: seven states each — including error and
-            sleeping — plus real interactivity. Watch them run an actual agent
-            workflow below, then dig into each direction. Drag Lattice. Poke
-            Pip.
+            Decision made: Lattice is the face of Coral Intelligence, live in
+            the nav on every page. Pip survives as a hidden skin — tap the
+            coral mark up there five times, or type{" "}
+            <span className="font-mono text-sm text-white/75">
+              ↑ ↑ ↓ ↓ ← → ← → B A
+            </span>
+            , and every Coral surface hatches into Pip. Tap five more to bring
+            Lattice back.
           </p>
         </header>
 
@@ -296,7 +295,7 @@ export default function MascotsPage() {
           <div className="mb-6 flex items-baseline gap-3">
             <h2 className="text-2xl font-bold text-white">Watch Coral work</h2>
             <p className="text-sm text-white/45">
-              scripted runs through the real state machine
+              scripted runs, rendered with your active skin
             </p>
           </div>
           <AgentPlayground />
@@ -309,54 +308,61 @@ export default function MascotsPage() {
           ))}
         </div>
 
-        {/* Decision guide */}
+        {/* Skin system */}
         <footer className="mt-28">
-          <h3 className="mb-8 text-center text-2xl font-bold text-white">
-            Which Coral is your Coral?
+          <h3 className="mb-3 text-center text-2xl font-bold text-white">
+            How the skin system works
           </h3>
+          <p className="mx-auto mb-10 max-w-xl text-center text-sm text-white/45">
+            Everything ships behind one component, so the easter egg costs
+            nothing at the call sites.
+          </p>
           <div className="grid gap-4 md:grid-cols-3">
-            {DIRECTIONS.map((direction) => {
-              const { Component } = direction;
-              return (
-                <div
-                  key={direction.id}
-                  className="flex flex-col items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center"
-                >
-                  <Component state="idle" size={120} />
-                  <p className="text-sm font-semibold text-white">
-                    {direction.name}
-                    <span className="ml-2 font-normal text-white/45">
-                      {direction.philosophy}
-                    </span>
-                  </p>
-                  <p className="text-sm leading-relaxed text-white/55">
-                    {direction.chooseIf}
-                  </p>
-                </div>
-              );
-            })}
-            <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-white/15 bg-transparent p-6 text-center">
-              <div className="flex items-center gap-4 py-4">
-                <CoralLattice state="idle" size={88} />
-                <span className="text-lg text-white/30">+</span>
-                <CoralPip state="idle" size={88} />
-              </div>
-              <p className="text-sm font-semibold text-white">
-                Or both
-                <span className="ml-2 font-normal text-white/45">
-                  The System &amp; the Face
-                </span>
+            <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-[#b78bfa]">
+                One component
+              </p>
+              <p className="font-mono text-sm text-white/80">
+                &lt;CoralMascot state=&quot;thinking&quot; /&gt;
               </p>
               <p className="text-sm leading-relaxed text-white/55">
-                Lattice as the brand mark and processing visual; Pip as an
-                optional companion skin users can enable. Serious by default,
-                lovable by choice.
+                Renders the active skin everywhere Coral appears — nav mark,
+                chat avatar, thinking indicator. Both skins share the same
+                seven-state API, so call sites never know which one is on.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-[#ffd76b]">
+                Two unlocks
+              </p>
+              <p className="font-mono text-sm text-white/80">
+                5× tap · ↑↑↓↓←→←→BA
+              </p>
+              <p className="text-sm leading-relaxed text-white/55">
+                Five quick taps on the coral mark, or the classic code from
+                anywhere. Either toggles the skin with a spring-in pop and a
+                beat of celebration. Pip even says hi in the console.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-[#7fd8e8]">
+                Sticky per user
+              </p>
+              <p className="font-mono text-sm text-white/80">
+                localStorage · coral-skin
+              </p>
+              <p className="text-sm leading-relaxed text-white/55">
+                The choice persists across sessions and applies instantly on
+                every surface via context. Swap localStorage for your user
+                preferences service when porting to the real Coral.
               </p>
             </div>
           </div>
           <p className="mt-12 text-center text-sm text-white/35">
-            Pick the direction and we&apos;ll productionize it — sizes, sound,
-            entrance animations, and the design system around it.
+            Porting guide for the real Coral repo:{" "}
+            <span className="font-mono text-xs">
+              components/mascots/README.md
+            </span>
           </p>
         </footer>
       </div>
