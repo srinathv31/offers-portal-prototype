@@ -12,8 +12,9 @@ import { usePrefersReducedMotion } from "./use-reduced-motion";
  * A small coral creature with a face. Personality does the work here:
  * Pip blinks, follows your cursor, leans in to listen, glances up to
  * think, chatters while speaking, and bounces with squash-and-stretch
- * when a task lands. Built on motion springs so every pose change
- * feels physical.
+ * when a task lands. It slumps with worried brows when something breaks,
+ * dozes off with floating z's when idle, and reacts if you poke it.
+ * Built on motion springs so every pose change feels physical.
  */
 
 const EYE_BIAS: Record<MascotState, { x: number; y: number }> = {
@@ -22,6 +23,8 @@ const EYE_BIAS: Record<MascotState, { x: number; y: number }> = {
   thinking: { x: 4.5, y: -4.5 },
   speaking: { x: 0, y: 0.5 },
   celebrating: { x: 0, y: 0 },
+  error: { x: 0, y: 2.5 },
+  sleeping: { x: 0, y: 0 },
 };
 
 const bodyVariants = {
@@ -66,6 +69,20 @@ const bodyVariants = {
       ease: "easeOut" as const,
     },
   },
+  error: {
+    y: 4,
+    rotate: -1.5,
+    scaleX: 1.01,
+    scaleY: 0.97,
+    transition: { type: "spring" as const, stiffness: 160, damping: 15 },
+  },
+  sleeping: {
+    y: [0, -3, 0],
+    rotate: 2.5,
+    scaleX: [1, 1.02, 1],
+    scaleY: [1, 1.035, 1],
+    transition: { duration: 4.6, repeat: Infinity, ease: "easeInOut" as const },
+  },
 };
 
 const shadowVariants = {
@@ -88,6 +105,12 @@ const shadowVariants = {
       ease: "easeOut" as const,
     },
   },
+  error: { scaleX: 1.04, opacity: 0.26 },
+  sleeping: {
+    scaleX: [1, 0.96, 1],
+    opacity: 0.2,
+    transition: { duration: 4.6, repeat: Infinity, ease: "easeInOut" as const },
+  },
 };
 
 const frondVariants = {
@@ -109,6 +132,10 @@ const frondVariants = {
       ease: "easeInOut" as const,
     },
   }),
+  droop: (i: number) => ({
+    rotate: i === 0 ? -15 : i === 1 ? 5 : 16,
+    transition: { duration: 0.6, ease: "easeOut" as const },
+  }),
   still: { rotate: 0 },
 };
 
@@ -126,8 +153,16 @@ const SPARKLES = [
   { x: 146, y: 158, s: 0.85, d: 0.62 },
 ];
 
+const ZZZ = [
+  { x: 138, y: 62, size: 9, d: 0 },
+  { x: 150, y: 48, size: 12, d: 0.55 },
+  { x: 164, y: 32, size: 15, d: 1.1 },
+];
+
 const STAR_PATH =
   "M0,-6 L1.7,-1.7 L6,0 L1.7,1.7 L0,6 L-1.7,1.7 L-6,0 L-1.7,-1.7 Z";
+const HEART_PATH =
+  "M0,3 C0,-1.5 -6.5,-2 -6.5,2.2 C-6.5,5.5 -2,7.5 0,10 C2,7.5 6.5,5.5 6.5,2.2 C6.5,-2 0,-1.5 0,3 Z";
 
 export function CoralPip({
   state = "idle",
@@ -137,6 +172,8 @@ export function CoralPip({
   const svgRef = useRef<SVGSVGElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [blink, setBlink] = useState(false);
+  const [poked, setPoked] = useState(false);
+  const pokeTimeout = useRef<number | undefined>(undefined);
 
   const pointerRef = useRef({ x: 0, y: 0, lastMove: 0 });
   const stateRef = useRef<MascotState>(state);
@@ -194,7 +231,7 @@ export function CoralPip({
     };
   }, [reducedMotion, eyeTargetX, eyeTargetY, tiltTarget]);
 
-  // Blinks — random cadence, occasional double blink
+  // Blinks — random cadence, occasional double blink, none while asleep
   useEffect(() => {
     if (reducedMotion) return;
     let timeout: number;
@@ -203,15 +240,17 @@ export function CoralPip({
     const schedule = (delay: number) => {
       timeout = window.setTimeout(() => {
         if (cancelled) return;
-        setBlink(true);
-        window.setTimeout(() => {
-          if (cancelled) return;
-          setBlink(false);
-          if (Math.random() < 0.22) {
-            window.setTimeout(() => !cancelled && setBlink(true), 130);
-            window.setTimeout(() => !cancelled && setBlink(false), 240);
-          }
-        }, 110);
+        if (stateRef.current !== "sleeping") {
+          setBlink(true);
+          window.setTimeout(() => {
+            if (cancelled) return;
+            setBlink(false);
+            if (Math.random() < 0.22) {
+              window.setTimeout(() => !cancelled && setBlink(true), 130);
+              window.setTimeout(() => !cancelled && setBlink(false), 240);
+            }
+          }, 110);
+        }
         schedule(2400 + Math.random() * 3200);
       }, delay);
     };
@@ -223,10 +262,23 @@ export function CoralPip({
     };
   }, [reducedMotion]);
 
+  useEffect(() => {
+    return () => window.clearTimeout(pokeTimeout.current);
+  }, []);
+
+  const poke = () => {
+    if (reducedMotion) return;
+    setPoked(true);
+    window.clearTimeout(pokeTimeout.current);
+    pokeTimeout.current = window.setTimeout(() => setPoked(false), 650);
+  };
+
   const animState = reducedMotion ? "still" : state;
   const overlay = (target: MascotState) =>
     !reducedMotion && state === target ? "on" : "off";
   const happy = state === "celebrating";
+  const asleep = state === "sleeping";
+  const mouthKey = poked ? "poke" : state;
 
   return (
     <svg
@@ -236,7 +288,8 @@ export function CoralPip({
       viewBox="0 0 200 200"
       role="img"
       aria-label="Coral Intelligence mascot — Pip"
-      className={cn("select-none overflow-visible", className)}
+      onPointerDown={poke}
+      className={cn("cursor-pointer select-none overflow-visible", className)}
     >
       <defs>
         <linearGradient id="pip-body" x1="0.2" y1="0" x2="0.75" y2="1">
@@ -255,7 +308,14 @@ export function CoralPip({
         </radialGradient>
       </defs>
 
-      <circle cx="100" cy="104" r="88" fill="url(#pip-glow)" />
+      <motion.circle
+        cx="100"
+        cy="104"
+        r="88"
+        fill="url(#pip-glow)"
+        animate={{ opacity: asleep ? 0.5 : 1 }}
+        transition={{ duration: 0.6 }}
+      />
 
       <motion.ellipse
         cx="100"
@@ -322,12 +382,45 @@ export function CoralPip({
         ))}
       </motion.g>
 
+      {/* Sleeping — drifting z's */}
+      <motion.g variants={fadeGroup} animate={overlay("sleeping")} initial="off">
+        {ZZZ.map((z, i) => (
+          <motion.text
+            key={i}
+            x={z.x}
+            y={z.y}
+            fontSize={z.size}
+            fontFamily="var(--font-geist-mono), monospace"
+            fontWeight="600"
+            fill="#c7a5ff"
+            animate={{ opacity: [0, 0.9, 0], y: [4, -8], x: [0, 3] }}
+            transition={{
+              duration: 2.6,
+              repeat: Infinity,
+              delay: z.d,
+              ease: "easeOut",
+            }}
+          >
+            z
+          </motion.text>
+        ))}
+      </motion.g>
+
       {/* Body + face — outer group runs state poses, inner group adds cursor tilt */}
       <motion.g
         variants={bodyVariants}
         animate={animState}
         style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
       >
+        <motion.g
+          animate={
+            poked
+              ? { y: [0, -9, 0], scaleX: [1, 1.06, 1], scaleY: [1, 0.93, 1] }
+              : { y: 0, scaleX: 1, scaleY: 1 }
+          }
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
+        >
         <motion.g
           style={{
             rotate: reducedMotion ? 0 : tilt,
@@ -346,7 +439,13 @@ export function CoralPip({
               custom={i}
               variants={frondVariants}
               animate={
-                reducedMotion ? "still" : happy ? "party" : "sway"
+                reducedMotion || asleep
+                  ? "still"
+                  : happy
+                    ? "party"
+                    : state === "error"
+                      ? "droop"
+                      : "sway"
               }
               style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
             >
@@ -381,12 +480,46 @@ export function CoralPip({
 
           {/* Blush */}
           <motion.g
-            animate={{ opacity: happy ? 0.55 : 0.3 }}
+            animate={{
+              opacity: happy ? 0.55 : state === "error" ? 0.12 : 0.3,
+            }}
             transition={{ duration: 0.3 }}
           >
             <ellipse cx="66" cy="112" rx="9" ry="5.5" fill="#ff5a5a" />
             <ellipse cx="134" cy="112" rx="9" ry="5.5" fill="#ff5a5a" />
           </motion.g>
+
+          {/* Worried brows (error) */}
+          <motion.g
+            stroke="#5c2c48"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            fill="none"
+            animate={{ opacity: state === "error" && !poked ? 0.85 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <path d="M73,76 Q82,72 90,76" />
+            <path d="M110,76 Q118,72 127,76" />
+          </motion.g>
+
+          {/* Sweat drop (error) — static translate lives on the wrapper so
+              motion's animated transform doesn't clobber it */}
+          <g transform="translate(141, 72)">
+          <motion.path
+            d="M0,0 C3,4 3.4,7.5 0,10 C-3.4,7.5 -3,4 0,0 Z"
+            fill="#7fd8e8"
+            animate={
+              state === "error" && !reducedMotion
+                ? { opacity: [0, 0.9, 0], y: [0, 11] }
+                : { opacity: 0, y: 0 }
+            }
+            transition={
+              state === "error"
+                ? { duration: 1.7, repeat: Infinity, ease: "easeIn" }
+                : { duration: 0.2 }
+            }
+          />
+          </g>
 
           {/* Eyes */}
           {[82, 118].map((eyeCx) => (
@@ -401,14 +534,27 @@ export function CoralPip({
                 animate={{ opacity: happy ? 1 : 0 }}
                 transition={{ duration: 0.15 }}
               />
+              {/* Closed lids (sleeping) */}
+              <motion.path
+                d={`M${eyeCx - 9},91 Q${eyeCx},98 ${eyeCx + 9},91`}
+                stroke="#35203b"
+                strokeWidth="5"
+                strokeLinecap="round"
+                fill="none"
+                animate={{ opacity: asleep ? 1 : 0 }}
+                transition={{ duration: 0.25 }}
+              />
               {/* Pupil */}
               <motion.g
-                animate={{ opacity: happy ? 0 : 1 }}
+                animate={{ opacity: happy || asleep ? 0 : 1 }}
                 transition={{ duration: 0.15 }}
               >
                 <motion.g style={{ x: eyeX, y: eyeY }}>
                   <motion.g
-                    animate={{ scaleY: blink ? 0.1 : 1 }}
+                    animate={{
+                      scaleY: blink ? 0.1 : poked ? 1.18 : 1,
+                      scaleX: poked ? 1.18 : 1,
+                    }}
                     transition={{ duration: 0.09 }}
                     style={{
                       transformBox: "fill-box",
@@ -436,14 +582,14 @@ export function CoralPip({
             </g>
           ))}
 
-          {/* Mouths — crossfaded per state */}
+          {/* Mouths — crossfaded per state (poke overrides with a surprised o) */}
           <motion.path
             d="M89,119 Q100,127 111,119"
             stroke="#4a2340"
             strokeWidth="4"
             strokeLinecap="round"
             fill="none"
-            animate={{ opacity: state === "idle" ? 1 : 0 }}
+            animate={{ opacity: mouthKey === "idle" ? 1 : 0 }}
             transition={{ duration: 0.15 }}
           />
           <motion.circle
@@ -451,7 +597,7 @@ export function CoralPip({
             cy="122"
             r="4"
             fill="#4a2340"
-            animate={{ opacity: state === "listening" ? 1 : 0 }}
+            animate={{ opacity: mouthKey === "listening" ? 1 : 0 }}
             transition={{ duration: 0.15 }}
           />
           <motion.path
@@ -459,11 +605,11 @@ export function CoralPip({
             stroke="#4a2340"
             strokeWidth="4"
             strokeLinecap="round"
-            animate={{ opacity: state === "thinking" ? 1 : 0 }}
+            animate={{ opacity: mouthKey === "thinking" ? 1 : 0 }}
             transition={{ duration: 0.15 }}
           />
           <motion.g
-            animate={{ opacity: state === "speaking" ? 1 : 0 }}
+            animate={{ opacity: mouthKey === "speaking" ? 1 : 0 }}
             transition={{ duration: 0.15 }}
           >
             <motion.ellipse
@@ -488,11 +634,55 @@ export function CoralPip({
           <motion.path
             d="M86,116 Q100,134 114,116 Q100,122 86,116 Z"
             fill="#4a2340"
-            animate={{ opacity: happy ? 1 : 0 }}
+            animate={{ opacity: mouthKey === "celebrating" ? 1 : 0 }}
             transition={{ duration: 0.15 }}
           />
+          {/* Worried wobble (error) */}
+          <motion.path
+            d="M91,122 Q95,119 99,122 Q103,125 108,121"
+            stroke="#4a2340"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            fill="none"
+            animate={{ opacity: mouthKey === "error" ? 1 : 0 }}
+            transition={{ duration: 0.15 }}
+          />
+          {/* Soft snore (sleeping) */}
+          <motion.circle
+            cx="100"
+            cy="123"
+            r="2.6"
+            fill="#4a2340"
+            animate={{ opacity: mouthKey === "sleeping" ? 0.85 : 0 }}
+            transition={{ duration: 0.25 }}
+          />
+          {/* Surprised o (poked) */}
+          <motion.circle
+            cx="100"
+            cy="122"
+            r="5.5"
+            fill="#4a2340"
+            animate={{ opacity: poked ? 1 : 0 }}
+            transition={{ duration: 0.1 }}
+          />
+        </motion.g>
         </motion.g>
       </motion.g>
+
+      {/* Poke — a little heart pops up */}
+      <g transform="translate(100, 30)">
+        <motion.path
+          d={HEART_PATH}
+          fill="#ff5a7a"
+          animate={
+            poked
+              ? { opacity: [0, 1, 0], y: [0, -16], scale: [0.4, 1.15, 0.9] }
+              : { opacity: 0, y: 0, scale: 0.4 }
+          }
+          transition={{ duration: 0.65, ease: "easeOut" }}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
+        />
+      </g>
 
       {/* Celebrating — sparkle burst, drawn above the body */}
       <motion.g variants={fadeGroup} animate={overlay("celebrating")} initial="off">

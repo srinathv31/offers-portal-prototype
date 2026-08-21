@@ -3,7 +3,9 @@ export type MascotState =
   | "listening"
   | "thinking"
   | "speaking"
-  | "celebrating";
+  | "celebrating"
+  | "error"
+  | "sleeping";
 
 export interface MascotProps {
   state?: MascotState;
@@ -22,4 +24,6 @@ export const MASCOT_STATES: {
   { value: "thinking", label: "Thinking", hint: "Reasoning across systems" },
   { value: "speaking", label: "Speaking", hint: "Streaming a response" },
   { value: "celebrating", label: "Celebrating", hint: "Task completed" },
+  { value: "error", label: "Error", hint: "Blocked — needs attention" },
+  { value: "sleeping", label: "Sleeping", hint: "Idle timeout / off-hours" },
 ];

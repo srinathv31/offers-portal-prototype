@@ -3,7 +3,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import {
-  CoralBloom,
+  AgentPlayground,
   CoralLattice,
   CoralPip,
   MASCOT_STATES,
@@ -19,6 +19,7 @@ interface Direction {
   tagline: string;
   description: string;
   principles: string[];
+  stageHint: string;
   chooseIf: string;
   accent: string;
   Component: ComponentType<MascotProps>;
@@ -26,36 +27,19 @@ interface Direction {
 
 const DIRECTIONS: Direction[] = [
   {
-    id: "bloom",
-    number: "01",
-    name: "Bloom",
-    philosophy: "The Organism",
-    tagline: "Intelligence that feels alive, not mechanical.",
-    description:
-      "A living coral polyp — generative, breathing, bioluminescent. Bloom never repeats a frame: its body is computed from layered harmonics, motes of light drift through it, and a warm nucleus swims inside. States are expressed as energy and accent light, so the presence always stays calm, ambient, and unmistakably organic.",
-    principles: [
-      "Breathes with the workload — reasoning literally churns inside it",
-      "Accent light signals state: aqua absorbs, violet reasons, gold delivers",
-      "Zero anthropomorphism — authority through serenity, not cuteness",
-    ],
-    chooseIf:
-      "You want Coral to feel like a calm, living presence woven into the product — premium and brand-first.",
-    accent: "#ff7a5c",
-    Component: CoralBloom,
-  },
-  {
     id: "lattice",
-    number: "02",
+    number: "01",
     name: "Lattice",
     philosophy: "The Constellation",
     tagline: "Intelligence as orchestration, made visible.",
     description:
-      "A constellation of data points wired into a living network — a nod to what Coral actually does: reasoning across campaigns, accounts, and systems. Lattice shows its thinking. Synapse pulses travel the graph while it reasons, the structure contracts to listen, and banded waves radiate outward as it responds.",
+      "A constellation of data points wired into a living network — a nod to what Coral actually does: reasoning across campaigns, accounts, and systems. Lattice shows its thinking: synapse pulses travel the graph while it reasons, the structure contracts to listen, and banded waves radiate as it responds. It's tactile too — drag to spin it, hover and nearby nodes reach toward you. When a task lands, the whole network gathers into a golden checkmark, holds, and springs back.",
     principles: [
       "The network is the metaphor — every node is a system Coral orchestrates",
-      "Visible computation builds trust: you can watch signals propagate",
-      "Reads as engineering-grade — credibility for a financial platform",
+      "Visible computation builds trust: watch signals propagate, watch errors fracture",
+      "The checkmark morph turns “task done” into a signature brand moment",
     ],
+    stageHint: "Drag to spin · hover to connect",
     chooseIf:
       "You want Coral to project technical depth and precision — an AI that enterprise stakeholders instinctively trust.",
     accent: "#b78bfa",
@@ -63,17 +47,18 @@ const DIRECTIONS: Direction[] = [
   },
   {
     id: "pip",
-    number: "03",
+    number: "02",
     name: "Pip",
     philosophy: "The Companion",
     tagline: "Intelligence as a colleague, not a system.",
     description:
-      "A small coral creature with a face — and therefore a relationship. Pip blinks on its own rhythm, follows your cursor, leans in when you type, glances up while it thinks, and bounces with squash-and-stretch when a campaign ships. Personality creates forgiveness, engagement, and memory in a way abstract marks can't.",
+      "A small coral creature with a face — and therefore a relationship. Pip blinks on its own rhythm, follows your cursor, leans in when you type, glances up while it thinks, and bounces with squash-and-stretch when a campaign ships. It slumps with worried brows when a system fails, dozes off with drifting z's after hours, and startles if you poke it. Personality creates forgiveness, engagement, and memory in a way abstract marks can't.",
     principles: [
       "Eye contact and micro-behaviors make every session feel attended",
-      "Emotion maps to workflow: attentive → curious → chatty → delighted",
+      "A full emotional register: attentive, curious, chatty, delighted, worried, asleep",
       "Disarms the intimidation of an AI touching money and campaigns",
     ],
+    stageHint: "Click Pip · move your cursor",
     chooseIf:
       "You want users to love Coral — a warm daily companion that gives the platform a memorable personality.",
     accent: "#ffd76b",
@@ -220,6 +205,9 @@ function MascotSection({ direction }: { direction: Direction }) {
               {direction.name} / {state}
             </span>
           </div>
+          <span className="pointer-events-none absolute bottom-4 right-5 text-[11px] font-medium uppercase tracking-[0.16em] text-white/25">
+            {direction.stageHint}
+          </span>
         </div>
 
         {/* Narrative */}
@@ -288,37 +276,31 @@ export default function MascotsPage() {
     <div className="min-h-screen bg-[#080610] bg-[radial-gradient(80%_50%_at_50%_-10%,#1b1030_0%,transparent_60%)]">
       <div className="container mx-auto max-w-6xl px-4 pb-28 pt-16 sm:pt-20">
         {/* Hero */}
-        <header className="mb-20 max-w-3xl">
+        <header className="mb-16 max-w-3xl">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#ff7a5c]">
             Coral Intelligence
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            Meet the face of Coral.
+            Two finalists.
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-white/60">
-            Three mascot directions, three philosophies — an organism, a
-            constellation, and a companion. Each one is fully alive: it idles,
-            listens while you type, visibly thinks, speaks, and celebrates when
-            a campaign ships. Click the states or let the auto-demo cycle.
+            Lattice and Pip, expanded: seven states each — including error and
+            sleeping — plus real interactivity. Watch them run an actual agent
+            workflow below, then dig into each direction. Drag Lattice. Poke
+            Pip.
           </p>
-          <nav className="mt-8 flex flex-wrap gap-3">
-            {DIRECTIONS.map((direction) => (
-              <a
-                key={direction.id}
-                href={`#${direction.id}`}
-                className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/70 transition-colors hover:border-white/40 hover:text-white"
-              >
-                <span
-                  className="mr-2 font-mono text-xs"
-                  style={{ color: direction.accent }}
-                >
-                  {direction.number}
-                </span>
-                {direction.name} — {direction.philosophy}
-              </a>
-            ))}
-          </nav>
         </header>
+
+        {/* Agent playground */}
+        <section id="playground" className="mb-24 scroll-mt-24">
+          <div className="mb-6 flex items-baseline gap-3">
+            <h2 className="text-2xl font-bold text-white">Watch Coral work</h2>
+            <p className="text-sm text-white/45">
+              scripted runs through the real state machine
+            </p>
+          </div>
+          <AgentPlayground />
+        </section>
 
         {/* Sections */}
         <div className="flex flex-col gap-24">
@@ -353,10 +335,28 @@ export default function MascotsPage() {
                 </div>
               );
             })}
+            <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-white/15 bg-transparent p-6 text-center">
+              <div className="flex items-center gap-4 py-4">
+                <CoralLattice state="idle" size={88} />
+                <span className="text-lg text-white/30">+</span>
+                <CoralPip state="idle" size={88} />
+              </div>
+              <p className="text-sm font-semibold text-white">
+                Or both
+                <span className="ml-2 font-normal text-white/45">
+                  The System &amp; the Face
+                </span>
+              </p>
+              <p className="text-sm leading-relaxed text-white/55">
+                Lattice as the brand mark and processing visual; Pip as an
+                optional companion skin users can enable. Serious by default,
+                lovable by choice.
+              </p>
+            </div>
           </div>
           <p className="mt-12 text-center text-sm text-white/35">
-            Pick a direction and we&apos;ll iterate — states, sizes, sounds,
-            and the full design system around it.
+            Pick the direction and we&apos;ll productionize it — sizes, sound,
+            entrance animations, and the design system around it.
           </p>
         </footer>
       </div>
