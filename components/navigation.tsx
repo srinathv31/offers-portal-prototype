@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CoralAvatar } from "@/components/coral-avatar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
 
@@ -83,9 +84,23 @@ export function Navigation() {
               >
                 Create Campaign
               </Link>
+              <Link
+                href="/mascots"
+                className={cn(
+                  "px-3 py-2 text-sm font-medium transition-colors hover:text-foreground",
+                  pathname === "/mascots"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                Coral AI
+              </Link>
             </div>
           </div>
-          <ModeToggle />
+          <div className="flex items-center gap-3">
+            <CoralAvatar />
+            <ModeToggle />
+          </div>
         </div>
       </div>
     </nav>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CoralSkinProvider } from "@/components/mascots";
 import { Navigation } from "@/components/navigation";
 
 const geistSans = Geist({
@@ -36,8 +37,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navigation />
-          {children}
+          <CoralSkinProvider>
+            <Navigation />
+            {children}
+          </CoralSkinProvider>
         </ThemeProvider>
       </body>
     </html>
